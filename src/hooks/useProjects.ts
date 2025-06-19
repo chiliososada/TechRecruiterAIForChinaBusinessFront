@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { businessClientManager } from '@/integrations/supabase/business-client';
 
 export interface Project {
   id: string;
@@ -29,7 +28,7 @@ export interface Project {
   description?: string;
   detail_description?: string;
   company_type: string;
-  is_active?: boolean; // Added missing is_active property
+  is_active?: boolean;
   tenant_id: string;
   created_at?: string;
   updated_at?: string;
@@ -41,29 +40,46 @@ export const useProjects = () => {
   const [loading, setLoading] = useState(false);
   const { currentTenant, user } = useAuth();
 
-  // Fetch projects for current tenant
+  // 案件の取得（JWT認証対応）
   const fetchProjects = async () => {
     if (!currentTenant?.id) {
-      console.log("No current tenant, skipping fetch");
+      console.log("現在のテナントが存在しません、取得をスキップします");
       return;
     }
-    
-    console.log("Fetching projects for tenant:", currentTenant.id);
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      console.log("Fetched projects from database:", data?.length || 0, "projects");
+    // ビジネスクライアントが認証されているかチェック
+    if (!businessClientManager.isAuthenticated()) {
+      console.log("ビジネスクライアントが認証されていません");
+      toast({
+        title: "認証エラー",
+        description: "ログインし直してください",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("テナント用の案件を取得中:", currentTenant.id);
+    setLoading(true);
+
+    try {
+      // 自動リフレッシュ付きでクエリを実行
+      const data = await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { data, error } = await client
+          .from('projects')
+          .select('*')
+          .eq('tenant_id', currentTenant.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data;
+      });
+
+      console.log("データベースから取得した案件:", data?.length || 0, "件");
       setProjects(data || []);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('案件取得エラー:', error);
       toast({
         title: "エラー",
         description: "案件の取得に失敗しました",
@@ -74,8 +90,8 @@ export const useProjects = () => {
     }
   };
 
-  // Create new project
-  const createProject = async (projectData: Omit<Project, 'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+  // 案件の作成
+  const createProject = async (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
     if (!currentTenant?.id || !user?.id) {
       toast({
         title: "エラー",
@@ -85,28 +101,43 @@ export const useProjects = () => {
       return null;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert([{
-          ...projectData,
-          tenant_id: currentTenant.id,
-          created_by: user.id,
-        }])
-        .select()
-        .single();
+    if (!businessClientManager.isAuthenticated()) {
+      toast({
+        title: "認証エラー",
+        description: "ログインし直してください",
+        variant: "destructive",
+      });
+      return null;
+    }
 
-      if (error) throw error;
+    try {
+      const result = await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { data, error } = await client
+          .from('projects')
+          .insert({
+            ...projectData,
+            tenant_id: currentTenant.id,
+            created_by: user.id,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      });
 
       toast({
         title: "成功",
-        description: "案件が正常に作成されました",
+        description: "案件を作成しました",
       });
 
-      await fetchProjects(); // Refresh the list
-      return data;
+      // プロジェクトリストを再取得
+      await fetchProjects();
+      return result;
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('案件作成エラー:', error);
       toast({
         title: "エラー",
         description: "案件の作成に失敗しました",
@@ -116,37 +147,45 @@ export const useProjects = () => {
     }
   };
 
-  // Update project
-  const updateProject = async (id: string, projectData: Partial<Project>) => {
-    if (!currentTenant?.id) {
-      console.error("No current tenant for update");
+  // 案件の更新
+  const updateProject = async (id: string, updates: Partial<Project>) => {
+    if (!businessClientManager.isAuthenticated()) {
+      toast({
+        title: "認証エラー",
+        description: "ログインし直してください",
+        variant: "destructive",
+      });
       return null;
     }
 
-    console.log("Updating project in database:", id, projectData);
-    
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .update(projectData)
-        .eq('id', id)
-        .eq('tenant_id', currentTenant.id) // Ensure tenant isolation
-        .select()
-        .single();
+      const result = await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { data, error } = await client
+          .from('projects')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('tenant_id', currentTenant?.id)
+          .select()
+          .single();
 
-      if (error) throw error;
-
-      console.log("Project updated successfully in database:", data);
+        if (error) throw error;
+        return data;
+      });
 
       toast({
         title: "成功",
-        description: "案件が正常に更新されました",
+        description: "案件を更新しました",
       });
 
-      // Don't call fetchProjects here - let the calling component handle it
-      return data;
+      // プロジェクトリストを再取得
+      await fetchProjects();
+      return result;
     } catch (error) {
-      console.error('Error updating project:', error);
+      console.error('案件更新エラー:', error);
       toast({
         title: "エラー",
         description: "案件の更新に失敗しました",
@@ -156,83 +195,42 @@ export const useProjects = () => {
     }
   };
 
-  // Archive project
-  const archiveProject = async (id: string, archiveReason?: string) => {
-    if (!currentTenant?.id || !user?.id) return false;
-
-    try {
-      // First get the project data
-      const { data: projectData, error: fetchError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .eq('tenant_id', currentTenant.id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Insert into archives
-      const { error: archiveError } = await supabase
-        .from('project_archives')
-        .insert([{
-          original_project_id: id,
-          project_data: projectData,
-          archive_reason: archiveReason || '手動アーカイブ',
-          archived_by: user.id,
-          tenant_id: currentTenant.id,
-        }]);
-
-      if (archiveError) throw archiveError;
-
-      // Mark project as inactive
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update({ is_active: false })
-        .eq('id', id)
-        .eq('tenant_id', currentTenant.id);
-
-      if (updateError) throw updateError;
-
+  // 案件の削除（論理削除）
+  const deleteProject = async (id: string) => {
+    if (!businessClientManager.isAuthenticated()) {
       toast({
-        title: "成功",
-        description: "案件が正常にアーカイブされました",
-      });
-
-      await fetchProjects(); // Refresh the list
-      return true;
-    } catch (error) {
-      console.error('Error archiving project:', error);
-      toast({
-        title: "エラー",
-        description: "案件のアーカイブに失敗しました",
+        title: "認証エラー",
+        description: "ログインし直してください",
         variant: "destructive",
       });
       return false;
     }
-  };
-
-  // Delete project permanently
-  const deleteProject = async (id: string) => {
-    if (!currentTenant?.id) return false;
 
     try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id)
-        .eq('tenant_id', currentTenant.id); // Ensure tenant isolation
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { error } = await client
+          .from('projects')
+          .update({
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('tenant_id', currentTenant?.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      });
 
       toast({
         title: "成功",
-        description: "案件が正常に削除されました",
+        description: "案件を削除しました",
       });
 
-      await fetchProjects(); // Refresh the list
+      // プロジェクトリストを再取得
+      await fetchProjects();
       return true;
     } catch (error) {
-      console.error('Error deleting project:', error);
+      console.error('案件削除エラー:', error);
       toast({
         title: "エラー",
         description: "案件の削除に失敗しました",
@@ -242,8 +240,9 @@ export const useProjects = () => {
     }
   };
 
+  // テナントまたは認証状態が変更された時に案件を取得
   useEffect(() => {
-    if (currentTenant?.id) {
+    if (currentTenant?.id && businessClientManager.isAuthenticated()) {
       fetchProjects();
     }
   }, [currentTenant?.id]);
@@ -254,7 +253,6 @@ export const useProjects = () => {
     fetchProjects,
     createProject,
     updateProject,
-    archiveProject,
     deleteProject,
   };
 };

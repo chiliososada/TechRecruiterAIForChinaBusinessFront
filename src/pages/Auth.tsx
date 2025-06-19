@@ -1,76 +1,99 @@
-
 import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from '@/hooks/use-toast';
-
-import { AuthHeader } from '@/components/auth/AuthHeader';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { AuthLoader } from '@/components/auth/AuthLoader';
+import { AuthHeader } from '@/components/auth/AuthHeader';
 
 export function Auth() {
   const { user, loading, signInWithGoogle } = useAuth();
   const location = useLocation();
-  
+
+  // リダイレクト先を決定
   const from = location.state?.from?.pathname || "/";
 
+  // URLパラメータとハッシュをチェック（OAuth等のため）
   useEffect(() => {
-    console.log('OAuth リダイレクト状況をチェック中');
+    console.log('認証ページロード、OAuth リダイレクト状況をチェック中');
+
+    // ハッシュパラメータをチェック（OAuth リダイレクト）
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
-    
+    const error = hashParams.get('error');
+    const errorDescription = hashParams.get('error_description');
+
     if (accessToken) {
-      console.log('URLでアクセストークンを発見');
-      toast({
-        title: "認証成功",
-        description: "ログイン中です...",
-      });
+      console.log('URLでアクセストークンを発見:', accessToken.substring(0, 20) + '...');
+      // OAuth成功時の処理（将来の拡張用）
     }
-    
+
+    if (error || errorDescription) {
+      console.error('OAuth エラー:', error, errorDescription);
+      // OAuth エラー時の処理（将来の拡張用）
+    }
+
+    // URLクエリパラメータをチェック
     const url = new URL(window.location.href);
-    const errorDescription = url.searchParams.get('error_description');
-    if (errorDescription) {
-      console.error('OAuth エラー:', errorDescription);
-      toast({
-        title: "ログイン失敗",
-        description: errorDescription,
-        variant: "destructive",
-      });
+    const queryError = url.searchParams.get('error');
+    const queryErrorDescription = url.searchParams.get('error_description');
+
+    if (queryError || queryErrorDescription) {
+      console.error('クエリパラメータエラー:', queryError, queryErrorDescription);
     }
   }, []);
 
+  // ローディング中の表示
+  if (loading) {
+    return <AuthLoader />;
+  }
+
+  // ユーザーが既にログインしている場合はリダイレクト
   if (user && !loading) {
     console.log("ユーザーは認証済み、リダイレクト先:", from);
     return <Navigate to={from} replace />;
   }
 
-  if (loading) {
-    return <AuthLoader />;
-  }
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-md mx-auto">
-        <AuthHeader />
-        
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login" className="japanese-text">ログイン</TabsTrigger>
-            <TabsTrigger value="register" className="japanese-text">アカウント登録</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="login">
-            <LoginForm onGoogleLogin={signInWithGoogle} />
-          </TabsContent>
-          
-          <TabsContent value="register">
-            <RegisterForm onGoogleLogin={signInWithGoogle} />
-          </TabsContent>
-        </Tabs>
-      </Card>
+      <div className="w-full max-w-md mx-auto p-4">
+        <Card className="w-full">
+          <AuthHeader />
+
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login" className="japanese-text">
+                ログイン
+              </TabsTrigger>
+              <TabsTrigger value="register" className="japanese-text">
+                アカウント登録
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login">
+              <LoginForm onGoogleLogin={signInWithGoogle} />
+            </TabsContent>
+
+            <TabsContent value="register">
+              <RegisterForm onGoogleLogin={signInWithGoogle} />
+            </TabsContent>
+          </Tabs>
+        </Card>
+
+        {/* 開発環境での情報表示 */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-4 bg-muted rounded-lg">
+            <h3 className="font-semibold mb-2 japanese-text">開発情報</h3>
+            <div className="text-sm space-y-1 japanese-text">
+              <p>リダイレクト先: {from}</p>
+              <p>認証システム: identity-hub-control</p>
+              <p>現在のURL: {window.location.href}</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
