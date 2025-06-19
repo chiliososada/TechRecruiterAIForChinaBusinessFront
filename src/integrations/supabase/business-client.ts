@@ -1,12 +1,13 @@
-// JWT認証対応の業務データベースクライアント
+// JWT認証対応の業務データベースクライアント管理器
 import { businessClient, setBusinessClientAuth } from './client';
 import { getStoredTokens, refreshToken as apiRefreshToken, clearStoredTokens, saveTokens } from '@/utils/auth-api';
-import type { Database } from './business-types';
 
-// JWT付きでの業務データアクセス用クライアント
+// JWT付きでの業務データアクセス用クライアント管理
 class BusinessClientManager {
     private static instance: BusinessClientManager;
     private isInitialized = false;
+    private retryCount = 0;
+    private maxRetries = 2;
 
     private constructor() { }
 
@@ -29,6 +30,7 @@ class BusinessClientManager {
                 const isValid = await this.verifyAndSetToken(accessToken, refreshToken);
                 if (isValid) {
                     this.isInitialized = true;
+                    console.log('業務クライアントが初期化されました');
                     return true;
                 }
             } catch (error) {
@@ -48,9 +50,9 @@ class BusinessClientManager {
             setBusinessClientAuth(accessToken);
 
             // 簡単なクエリでトークンの有効性を確認
-            const { error } = await businessClient.from('projects').select('id').limit(1);
+            const testResult = await this.testConnection();
 
-            if (error) {
+            if (!testResult.success) {
                 // トークンが無効な場合、リフレッシュを試行
                 if (refreshToken) {
                     const refreshResult = await apiRefreshToken(refreshToken);
@@ -58,6 +60,7 @@ class BusinessClientManager {
                         setBusinessClientAuth(refreshResult.data.access_token);
                         saveTokens(refreshResult.data.access_token, refreshToken);
                         this.isInitialized = true;
+                        console.log('トークンがリフレッシュされました');
                         return true;
                     }
                 }
@@ -65,6 +68,7 @@ class BusinessClientManager {
             }
 
             this.isInitialized = true;
+            console.log('業務クライアントのトークンが設定されました');
             return true;
         } catch (error) {
             console.error('トークン設定エラー:', error);
@@ -78,10 +82,9 @@ class BusinessClientManager {
         setBusinessClientAuth(accessToken);
 
         try {
-            // 簡単なクエリでトークンをテスト
-            const { error } = await businessClient.from('projects').select('id').limit(1);
+            const testResult = await this.testConnection();
 
-            if (error && refreshToken) {
+            if (!testResult.success && refreshToken) {
                 // リフレッシュトークンで再試行
                 const refreshResult = await apiRefreshToken(refreshToken);
                 if (refreshResult.success && refreshResult.data) {
@@ -91,62 +94,143 @@ class BusinessClientManager {
                 }
             }
 
-            return !error;
+            return testResult.success;
         } catch (error) {
             console.error('トークン検証エラー:', error);
             return false;
         }
     }
 
+    // 接続テスト
+    private async testConnection(): Promise<{ success: boolean; error?: string }> {
+        try {
+            // プロジェクトテーブルに対して軽量なクエリを実行
+            const { error } = await businessClient.from('projects').select('id').limit(1);
+
+            if (error) {
+                console.error('接続テストエラー:', error);
+                return { success: false, error: error.message };
+            }
+
+            return { success: true };
+        } catch (error: any) {
+            console.error('接続テスト例外:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     // 認証のクリア
     public clearAuth(): void {
-        setBusinessClientAuth(''); // 空文字列でクリア
+        // 直接 businessClient の setAuth を呼び出す
+        businessClient.setAuth(null);
         clearStoredTokens();
         this.isInitialized = false;
+        this.retryCount = 0;
+        console.log('業務クライアントの認証がクリアされました');
     }
 
     // 認証済みクライアントの取得
     public getClient() {
         if (!this.isInitialized) {
-            throw new Error('ビジネスクライアントが初期化されていません。先にログインしてください。');
+            throw new Error('業務クライアントが初期化されていません。先にログインしてください。');
         }
         return businessClient;
     }
 
     // 認証状態の確認
     public isAuthenticated(): boolean {
-        return this.isInitialized;
+        return this.isInitialized && businessClient.isAuthenticated();
     }
 
     // 自動リフレッシュ付きのクエリ実行
     public async executeWithRetry<T>(
         queryFn: () => Promise<T>,
-        maxRetries: number = 1
+        maxRetries: number = this.maxRetries
     ): Promise<T> {
         let attempts = 0;
 
         while (attempts <= maxRetries) {
             try {
-                return await queryFn();
+                const result = await queryFn();
+                this.retryCount = 0; // 成功したらリトライカウントをリセット
+                return result;
             } catch (error: any) {
-                if (error?.code === 'PGRST301' && attempts < maxRetries) {
-                    // JWT エラーの場合、リフレッシュを試行
+                console.error(`クエリ実行エラー (試行 ${attempts + 1}/${maxRetries + 1}):`, error);
+
+                // JWT エラーまたは認証エラーの場合
+                if (this.isAuthenticationError(error) && attempts < maxRetries) {
                     const { refreshToken } = getStoredTokens();
                     if (refreshToken) {
-                        const refreshResult = await apiRefreshToken(refreshToken);
-                        if (refreshResult.success && refreshResult.data) {
-                            setBusinessClientAuth(refreshResult.data.access_token);
-                            saveTokens(refreshResult.data.access_token, refreshToken);
-                            attempts++;
-                            continue;
+                        try {
+                            const refreshResult = await apiRefreshToken(refreshToken);
+                            if (refreshResult.success && refreshResult.data) {
+                                setBusinessClientAuth(refreshResult.data.access_token);
+                                saveTokens(refreshResult.data.access_token, refreshToken);
+                                console.log('トークンがリフレッシュされ、リトライします');
+                                attempts++;
+                                continue;
+                            }
+                        } catch (refreshError) {
+                            console.error('トークンリフレッシュエラー:', refreshError);
                         }
                     }
                 }
-                throw error;
+
+                // リトライ上限に達した場合またはその他のエラー
+                if (attempts >= maxRetries) {
+                    if (this.isAuthenticationError(error)) {
+                        this.clearAuth();
+                        throw new Error('認証エラー: ログインし直してください');
+                    }
+                    throw error;
+                }
+
+                attempts++;
             }
         }
 
-        throw new Error('認証エラー: ログインし直してください');
+        throw new Error('クエリ実行に失敗しました');
+    }
+
+    // 認証エラーかどうかを判定
+    private isAuthenticationError(error: any): boolean {
+        if (!error) return false;
+
+        const authErrorCodes = ['PGRST301', 'PGRST302', '401', 'UNAUTHORIZED'];
+        const authErrorMessages = ['JWT', 'authorization', 'token', 'unauthorized', 'invalid signature'];
+
+        // エラーコードをチェック
+        if (error.code && authErrorCodes.some(code => error.code.includes(code))) {
+            return true;
+        }
+
+        // エラーメッセージをチェック
+        const errorMessage = (error.message || error.details || '').toLowerCase();
+        return authErrorMessages.some(msg => errorMessage.includes(msg));
+    }
+
+    // 強制的にトークンを再取得
+    public async forceRefreshToken(): Promise<boolean> {
+        const { refreshToken } = getStoredTokens();
+        if (!refreshToken) {
+            this.clearAuth();
+            return false;
+        }
+
+        try {
+            const refreshResult = await apiRefreshToken(refreshToken);
+            if (refreshResult.success && refreshResult.data) {
+                setBusinessClientAuth(refreshResult.data.access_token);
+                saveTokens(refreshResult.data.access_token, refreshToken);
+                this.isInitialized = true;
+                return true;
+            }
+        } catch (error) {
+            console.error('強制トークンリフレッシュエラー:', error);
+        }
+
+        this.clearAuth();
+        return false;
     }
 }
 
@@ -172,4 +256,8 @@ export const clearBusinessClientAuth = (): void => {
 
 export const isBusinessClientAuthenticated = (): boolean => {
     return businessClientManager.isAuthenticated();
+};
+
+export const executeBusinessQuery = async <T>(queryFn: () => Promise<T>): Promise<T> => {
+    return await businessClientManager.executeWithRetry(queryFn);
 };

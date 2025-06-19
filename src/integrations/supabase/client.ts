@@ -1,4 +1,4 @@
-// 改進されたSupabase認証システム統合
+// 改進されたSupabase認証システム統合 - 分離版
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -8,9 +8,9 @@ const AUTH_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 
 // 業務データベース用Supabase設定
 const BUSINESS_SUPABASE_URL = "https://aasiwxtosnmvjupikjvs.supabase.co";
-const BUSINESS_SUPABASE_ANON_KEY = "YOUR_BUSINESS_ANON_KEY_HERE"; // 実際のキーに置き換えてください
+const BUSINESS_SUPABASE_ANON_KEY = "YOUR_BUSINESS_ANON_KEY_HERE"; // 既に更新済み
 
-// 認証専用クライアント
+// 認証専用クライアント（identity-hub-control用）
 export const authClient = createClient(
   AUTH_SUPABASE_URL,
   AUTH_SUPABASE_ANON_KEY,
@@ -24,7 +24,7 @@ export const authClient = createClient(
   }
 );
 
-// 業務データ専用クライアント - カスタムJWT認証
+// 業務データ専用クライアント - JWT認証対応
 class BusinessSupabaseClient {
   private client: ReturnType<typeof createClient<Database>>;
   private currentToken: string | null = null;
@@ -38,6 +38,9 @@ class BusinessSupabaseClient {
           autoRefreshToken: false,
           persistSession: false,
           detectSessionInUrl: false,
+        },
+        global: {
+          headers: {},
         }
       }
     );
@@ -46,119 +49,95 @@ class BusinessSupabaseClient {
   // JWT トークンを設定
   setAuth(token: string | null) {
     this.currentToken = token;
+    // Supabaseの組み込みメソッドを使用してトークンを設定
+    if (token) {
+      // 新しいクライアントインスタンスを作成してトークンを設定
+      this.client = createClient<Database>(
+        BUSINESS_SUPABASE_URL,
+        BUSINESS_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false,
+          },
+          global: {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        }
+      );
+    } else {
+      // トークンなしのクライアントに戻す
+      this.client = createClient<Database>(
+        BUSINESS_SUPABASE_URL,
+        BUSINESS_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false,
+          }
+        }
+      );
+    }
   }
 
-  // 認証済みのクエリを実行
-  private async executeWithAuth<T>(
-    operation: (client: ReturnType<typeof createClient<Database>>) => Promise<T>
-  ): Promise<T> {
-    if (!this.currentToken) {
-      throw new Error('認証トークンが設定されていません');
-    }
-
-    // 一時的にグローバルヘッダーを設定
-    const originalAuth = this.client.functions.setAuth;
-    this.client.functions.setAuth(this.currentToken);
-
-    try {
-      const result = await operation(this.client);
-      return result;
-    } finally {
-      // ヘッダーをリセット
-      this.client.functions.setAuth(null);
-    }
+  // トークンの有効性を確認
+  public hasValidToken(): boolean {
+    return !!this.currentToken;
   }
 
-  // テーブルアクセス用のプロキシ
+  // テーブルアクセス
   from<TableName extends keyof Database['public']['Tables']>(
     table: TableName
   ) {
-    const originalFrom = this.client.from(table);
-
-    // クエリメソッドをオーバーライド
-    return {
-      select: (columns?: string) => {
-        const query = originalFrom.select(columns);
-        return this.wrapQuery(query);
-      },
-      insert: (data: any) => {
-        const query = originalFrom.insert(data);
-        return this.wrapQuery(query);
-      },
-      update: (data: any) => {
-        const query = originalFrom.update(data);
-        return this.wrapQuery(query);
-      },
-      delete: () => {
-        const query = originalFrom.delete();
-        return this.wrapQuery(query);
-      },
-      upsert: (data: any) => {
-        const query = originalFrom.upsert(data);
-        return this.wrapQuery(query);
-      }
-    };
-  }
-
-  // クエリを認証付きで実行するラッパー
-  private wrapQuery(query: any) {
-    const originalMethods = {};
-
-    // 実行メソッドをラップ
-    ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'containedBy', 'rangeGt', 'rangeGte', 'rangeLt', 'rangeLte', 'rangeAdjacent', 'overlaps', 'textSearch', 'match', 'not', 'or', 'filter', 'order', 'limit', 'range', 'single', 'maybe_single'].forEach(method => {
-      if (query[method]) {
-        const originalMethod = query[method].bind(query);
-        query[method] = (...args: any[]) => {
-          const result = originalMethod(...args);
-          return this.wrapQuery(result);
-        };
-      }
-    });
-
-    // 最終実行メソッド
-    const originalThen = query.then;
-    if (originalThen) {
-      query.then = async (resolve?: any, reject?: any) => {
-        try {
-          if (!this.currentToken) {
-            throw new Error('認証トークンが設定されていません');
-          }
-
-          // 認証ヘッダーを設定
-          query.headers = {
-            ...query.headers,
-            'Authorization': `Bearer ${this.currentToken}`
-          };
-
-          return await originalThen.call(query, resolve, reject);
-        } catch (error) {
-          if (reject) reject(error);
-          throw error;
-        }
-      };
+    if (!this.currentToken) {
+      throw new Error('認証トークンが設定されていません。ログインしてください。');
     }
-
-    return query;
+    return this.client.from(table);
   }
 
-  // RPCコール用 - 型安全性を緩和
-  rpc(fnName: string, params?: any) {
-    const rpcCall = (this.client as any).rpc(fnName, params);
-    return this.wrapQuery(rpcCall);
+  // RPC コール
+  rpc(
+    fn: string,
+    args?: any
+  ) {
+    if (!this.currentToken) {
+      throw new Error('認証トークンが設定されていません。ログインしてください。');
+    }
+    return (this.client as any).rpc(fn, args);
   }
 
-  // ストレージアクセス用
+  // ストレージアクセス
   get storage() {
+    if (!this.currentToken) {
+      throw new Error('認証トークンが設定されていません。ログインしてください。');
+    }
     return this.client.storage;
   }
 
-  // Functions アクセス用
+  // Functions アクセス
   get functions() {
+    if (!this.currentToken) {
+      throw new Error('認証トークンが設定されていません。ログインしてください。');
+    }
     return this.client.functions;
+  }
+
+  // 認証状態のチェック
+  isAuthenticated(): boolean {
+    return this.hasValidToken();
+  }
+
+  // クライアントインスタンスの取得（内部使用）
+  getClient() {
+    return this.client;
   }
 }
 
-// 業務クライアントのインスタンス
+// 業務クライアントのシングルトンインスタンス
 export const businessClient = new BusinessSupabaseClient();
 
 // 便利関数
@@ -166,16 +145,17 @@ export const setBusinessClientAuth = (token: string | null) => {
   businessClient.setAuth(token);
 };
 
-export const clearBusinessClientAuth = () => {
-  businessClient.setAuth(null);
+export const isBusinessClientAuthenticated = (): boolean => {
+  return businessClient.isAuthenticated();
 };
 
-// 後方互換性
+// 後方互換性のため - 既存のコードが supabase を使用している場合
 export const supabase = businessClient;
 
+// 認証状態の取得
 export const getAuthStatus = () => {
   return {
-    hasAuthToken: !!(businessClient as any).currentToken,
-    authToken: (businessClient as any).currentToken
+    hasAuthToken: businessClient.hasValidToken(),
+    isAuthenticated: businessClient.isAuthenticated()
   };
 };
