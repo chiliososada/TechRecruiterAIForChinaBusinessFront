@@ -17,7 +17,7 @@ import BatchMatching from "./pages/BatchMatching";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ToastProvider } from "@/hooks/toast/toast-provider";
-
+import { DebugPanel } from "@/components/layout/DebugPanel"; // 添加这一行
 import AuthDebug from "./pages/Auth";
 
 const queryClient = new QueryClient({
@@ -68,6 +68,8 @@ const App = () => (
 
             </Routes>
           </BrowserRouter>
+          {/* 添加调试面板 - 只在开发环境显示 */}
+          <DebugPanel />
         </AuthProvider>
       </TooltipProvider>
     </ToastProvider>

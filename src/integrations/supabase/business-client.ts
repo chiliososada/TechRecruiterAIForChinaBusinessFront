@@ -101,8 +101,8 @@ class BusinessClientManager {
         }
     }
 
-    // 接続テスト
-    private async testConnection(): Promise<{ success: boolean; error?: string }> {
+    // 接続テスト - パブリックメソッドに変更
+    public async testConnection(): Promise<{ success: boolean; error?: string }> {
         try {
             // プロジェクトテーブルに対して軽量なクエリを実行
             const { error } = await businessClient.from('projects').select('id').limit(1);
@@ -117,6 +117,45 @@ class BusinessClientManager {
             console.error('接続テスト例外:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    // 認証エラーかどうかを判定
+    private isAuthError(error: any): boolean {
+        const authErrorCodes = ['PGRST301', 'PGRST302', '401', '403'];
+        const authErrorMessages = ['JWT', 'authorization', 'token', 'unauthorized', 'invalid signature'];
+
+        // エラーコードをチェック
+        if (error.code && authErrorCodes.some(code => error.code.includes(code))) {
+            return true;
+        }
+
+        // エラーメッセージをチェック
+        const errorMessage = (error.message || error.details || '').toLowerCase();
+        return authErrorMessages.some(msg => errorMessage.includes(msg));
+    }
+
+    // 強制的にトークンを再取得
+    public async forceRefreshToken(): Promise<boolean> {
+        const { refreshToken } = getStoredTokens();
+        if (!refreshToken) {
+            this.clearAuth();
+            return false;
+        }
+
+        try {
+            const refreshResult = await apiRefreshToken(refreshToken);
+            if (refreshResult.success && refreshResult.data) {
+                setBusinessClientAuth(refreshResult.data.access_token);
+                saveTokens(refreshResult.data.access_token, refreshToken);
+                this.isInitialized = true;
+                return true;
+            }
+        } catch (error) {
+            console.error('強制トークンリフレッシュエラー:', error);
+        }
+
+        this.clearAuth();
+        return false;
     }
 
     // 認証のクリア
@@ -157,80 +196,29 @@ class BusinessClientManager {
             } catch (error: any) {
                 console.error(`クエリ実行エラー (試行 ${attempts + 1}/${maxRetries + 1}):`, error);
 
-                // JWT エラーまたは認証エラーの場合
-                if (this.isAuthenticationError(error) && attempts < maxRetries) {
-                    const { refreshToken } = getStoredTokens();
-                    if (refreshToken) {
-                        try {
-                            const refreshResult = await apiRefreshToken(refreshToken);
-                            if (refreshResult.success && refreshResult.data) {
-                                setBusinessClientAuth(refreshResult.data.access_token);
-                                saveTokens(refreshResult.data.access_token, refreshToken);
-                                console.log('トークンがリフレッシュされ、リトライします');
-                                attempts++;
-                                continue;
-                            }
-                        } catch (refreshError) {
-                            console.error('トークンリフレッシュエラー:', refreshError);
-                        }
-                    }
-                }
+                attempts++;
 
-                // リトライ上限に達した場合またはその他のエラー
-                if (attempts >= maxRetries) {
-                    if (this.isAuthenticationError(error)) {
-                        this.clearAuth();
-                        throw new Error('認証エラー: ログインし直してください');
+                // 認証エラーの場合のみリトライ
+                if (this.isAuthError(error) && attempts <= maxRetries) {
+                    console.log('認証エラーを検出、トークンリフレッシュを試行中...');
+
+                    const refreshSuccess = await this.forceRefreshToken();
+                    if (!refreshSuccess) {
+                        console.error('トークンリフレッシュに失敗');
+                        throw new Error('認証が期限切れです。再ログインしてください。');
                     }
+
+                    console.log('トークンリフレッシュ成功、再試行中...');
+                    continue;
+                } else {
+                    // 認証エラー以外、または最大リトライ回数に達した場合
                     throw error;
                 }
-
-                attempts++;
             }
         }
 
-        throw new Error('クエリ実行に失敗しました');
-    }
-
-    // 認証エラーかどうかを判定
-    private isAuthenticationError(error: any): boolean {
-        if (!error) return false;
-
-        const authErrorCodes = ['PGRST301', 'PGRST302', '401', 'UNAUTHORIZED'];
-        const authErrorMessages = ['JWT', 'authorization', 'token', 'unauthorized', 'invalid signature'];
-
-        // エラーコードをチェック
-        if (error.code && authErrorCodes.some(code => error.code.includes(code))) {
-            return true;
-        }
-
-        // エラーメッセージをチェック
-        const errorMessage = (error.message || error.details || '').toLowerCase();
-        return authErrorMessages.some(msg => errorMessage.includes(msg));
-    }
-
-    // 強制的にトークンを再取得
-    public async forceRefreshToken(): Promise<boolean> {
-        const { refreshToken } = getStoredTokens();
-        if (!refreshToken) {
-            this.clearAuth();
-            return false;
-        }
-
-        try {
-            const refreshResult = await apiRefreshToken(refreshToken);
-            if (refreshResult.success && refreshResult.data) {
-                setBusinessClientAuth(refreshResult.data.access_token);
-                saveTokens(refreshResult.data.access_token, refreshToken);
-                this.isInitialized = true;
-                return true;
-            }
-        } catch (error) {
-            console.error('強制トークンリフレッシュエラー:', error);
-        }
-
-        this.clearAuth();
-        return false;
+        // このポイントには到達しないはずですが、TypeScriptのために
+        throw new Error('予期しないエラー');
     }
 }
 
