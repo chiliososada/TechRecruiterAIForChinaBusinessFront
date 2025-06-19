@@ -33,6 +33,18 @@ export interface Project {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
+  source?: string;
+  source_document_url?: string;
+  ai_processed?: boolean;
+  ai_extracted_project_data?: any;
+  ai_match_embedding?: string;
+  ai_match_paraphrase?: string;
+  primary_manager_id?: string;
+  received_date?: string;
+  registered_at?: string;
+  application_deadline?: string;
+  key_technologies?: string;
+  max_candidates?: number;
 }
 
 export const useProjects = () => {
@@ -80,11 +92,24 @@ export const useProjects = () => {
       setProjects(data || []);
     } catch (error) {
       console.error('案件取得エラー:', error);
-      toast({
-        title: "エラー",
-        description: "案件の取得に失敗しました",
-        variant: "destructive",
-      });
+
+      // 認証エラーの場合は具体的なメッセージを表示
+      if (error instanceof Error && error.message.includes('認証')) {
+        toast({
+          title: "認証エラー",
+          description: "セッションが期限切れです。再ログインしてください",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "エラー",
+          description: "案件の取得に失敗しました",
+          variant: "destructive",
+        });
+      }
+
+      // 認証エラーの場合は空配列を設定
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -119,6 +144,8 @@ export const useProjects = () => {
             ...projectData,
             tenant_id: currentTenant.id,
             created_by: user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
             is_active: true,
           })
           .select()
@@ -128,12 +155,14 @@ export const useProjects = () => {
         return data;
       });
 
+      console.log("案件が作成されました:", result.id);
+
       toast({
         title: "成功",
-        description: "案件を作成しました",
+        description: "案件が正常に作成されました",
       });
 
-      // プロジェクトリストを再取得
+      // リストを更新
       await fetchProjects();
       return result;
     } catch (error) {
@@ -148,14 +177,23 @@ export const useProjects = () => {
   };
 
   // 案件の更新
-  const updateProject = async (id: string, updates: Partial<Project>) => {
+  const updateProject = async (projectId: string, updateData: Partial<Project>) => {
+    if (!currentTenant?.id) {
+      toast({
+        title: "エラー",
+        description: "認証情報が不足しています",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     if (!businessClientManager.isAuthenticated()) {
       toast({
         title: "認証エラー",
         description: "ログインし直してください",
         variant: "destructive",
       });
-      return null;
+      return false;
     }
 
     try {
@@ -164,11 +202,11 @@ export const useProjects = () => {
         const { data, error } = await client
           .from('projects')
           .update({
-            ...updates,
+            ...updateData,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', id)
-          .eq('tenant_id', currentTenant?.id)
+          .eq('id', projectId)
+          .eq('tenant_id', currentTenant.id)
           .select()
           .single();
 
@@ -176,14 +214,16 @@ export const useProjects = () => {
         return data;
       });
 
+      console.log("案件が更新されました:", result.id);
+
       toast({
         title: "成功",
-        description: "案件を更新しました",
+        description: "案件が正常に更新されました",
       });
 
-      // プロジェクトリストを再取得
+      // リストを更新
       await fetchProjects();
-      return result;
+      return true;
     } catch (error) {
       console.error('案件更新エラー:', error);
       toast({
@@ -191,12 +231,21 @@ export const useProjects = () => {
         description: "案件の更新に失敗しました",
         variant: "destructive",
       });
-      return null;
+      return false;
     }
   };
 
   // 案件の削除（論理削除）
-  const deleteProject = async (id: string) => {
+  const deleteProject = async (projectId: string) => {
+    if (!currentTenant?.id) {
+      toast({
+        title: "エラー",
+        description: "認証情報が不足しています",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     if (!businessClientManager.isAuthenticated()) {
       toast({
         title: "認証エラー",
@@ -215,18 +264,20 @@ export const useProjects = () => {
             is_active: false,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', id)
-          .eq('tenant_id', currentTenant?.id);
+          .eq('id', projectId)
+          .eq('tenant_id', currentTenant.id);
 
         if (error) throw error;
       });
 
+      console.log("案件が削除されました:", projectId);
+
       toast({
         title: "成功",
-        description: "案件を削除しました",
+        description: "案件が正常に削除されました",
       });
 
-      // プロジェクトリストを再取得
+      // リストを更新
       await fetchProjects();
       return true;
     } catch (error) {
@@ -240,12 +291,94 @@ export const useProjects = () => {
     }
   };
 
-  // テナントまたは認証状態が変更された時に案件を取得
+  // 案件のアーカイブ
+  const archiveProject = async (projectId: string, archiveReason?: string) => {
+    if (!currentTenant?.id || !user?.id) {
+      toast({
+        title: "エラー",
+        description: "認証情報が不足しています",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!businessClientManager.isAuthenticated()) {
+      toast({
+        title: "認証エラー",
+        description: "ログインし直してください",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+
+        // まず案件データを取得
+        const { data: projectData, error: fetchError } = await client
+          .from('projects')
+          .select('*')
+          .eq('id', projectId)
+          .eq('tenant_id', currentTenant.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // アーカイブテーブルに保存
+        const { error: archiveError } = await client
+          .from('project_archives')
+          .insert({
+            original_project_id: projectId,
+            project_data: projectData,
+            archive_reason: archiveReason,
+            archived_by: user.id,
+            archived_at: new Date().toISOString(),
+            tenant_id: currentTenant.id,
+          });
+
+        if (archiveError) throw archiveError;
+
+        // 元の案件を無効化
+        const { error: updateError } = await client
+          .from('projects')
+          .update({
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', projectId)
+          .eq('tenant_id', currentTenant.id);
+
+        if (updateError) throw updateError;
+      });
+
+      console.log("案件がアーカイブされました:", projectId);
+
+      toast({
+        title: "成功",
+        description: "案件が正常にアーカイブされました",
+      });
+
+      // リストを更新
+      await fetchProjects();
+      return true;
+    } catch (error) {
+      console.error('案件アーカイブエラー:', error);
+      toast({
+        title: "エラー",
+        description: "案件のアーカイブに失敗しました",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // 初期化時に案件を取得
   useEffect(() => {
     if (currentTenant?.id && businessClientManager.isAuthenticated()) {
       fetchProjects();
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, businessClientManager.isAuthenticated()]);
 
   return {
     projects,
@@ -254,5 +387,6 @@ export const useProjects = () => {
     createProject,
     updateProject,
     deleteProject,
+    archiveProject,
   };
 };

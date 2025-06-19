@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { businessClientManager } from '@/integrations/supabase/business-client';
 
 export interface DatabaseEngineer {
   id: string;
@@ -32,6 +32,29 @@ export interface DatabaseEngineer {
   created_at: string;
   updated_at: string;
   tenant_id: string;
+  is_active: boolean | null;
+  deleted_at: string | null;
+  // 其他可能的字段
+  source_details: string | null;
+  skills_detail: any | null;
+  project_history: any | null;
+  desired_rate_min: number | null;
+  desired_rate_max: number | null;
+  overtime_available: boolean | null;
+  business_trip_available: boolean | null;
+  documents: any | null;
+  ai_extracted_data: any | null;
+  ai_match_embedding: string | null;
+  ai_match_paraphrase: string | null;
+  evaluations: any | null;
+  last_active_at: string | null;
+  profile_completion_rate: number | null;
+  created_by: string | null;
+  resume_url: string | null;
+  resume_text: string | null;
+  preferred_work_style: string[] | null;
+  preferred_locations: string[] | null;
+  recommendation: string | null;
 }
 
 export const useEngineers = (companyType: 'own' | 'other') => {
@@ -58,35 +81,52 @@ export const useEngineers = (companyType: 'own' | 'other') => {
   // 获取engineers数据 - 只获取 is_active = true 的记录
   const fetchEngineers = async () => {
     if (!currentTenant) {
-      console.log('No current tenant, skipping engineer fetch');
+      console.log('現在のテナントが存在しません、エンジニア取得をスキップします');
       setLoading(false);
       return;
     }
-    
+
+    if (!businessClientManager.isAuthenticated()) {
+      console.log('ビジネスクライアントが認証されていません');
+      toast.error('認証エラー: ログインし直してください');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       console.log('Fetching engineers for tenant:', currentTenant.id, 'companyType:', companyTypeMapping[companyType]);
-      
-      const { data, error } = await supabase
-        .from('engineers')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .eq('company_type', companyTypeMapping[companyType])
-        .eq('is_active', true) // 只获取活跃的记录
-        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching engineers:', error);
-        throw error;
-      }
-      
+      const data = await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { data, error } = await client
+          .from('engineers')
+          .select('*')
+          .eq('tenant_id', currentTenant.id)
+          .eq('company_type', companyTypeMapping[companyType])
+          .eq('is_active', true) // 只获取活跃的记录
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data;
+      });
+
       console.log('Successfully fetched engineers:', data?.length || 0);
       setEngineers(data || []);
     } catch (error: any) {
       console.error('Error fetching engineers:', error);
-      setError(error.message || 'データの取得に失敗しました');
-      toast.error('人材データの取得に失敗しました: ' + (error.message || ''));
+      const errorMessage = error.message || 'データの取得に失敗しました';
+      setError(errorMessage);
+
+      // 認証エラーの場合は具体的なメッセージを表示
+      if (error.message && error.message.includes('認証')) {
+        toast.error('認証エラー: セッションが期限切れです。再ログインしてください');
+      } else {
+        toast.error('人材データの取得に失敗しました: ' + errorMessage);
+      }
+
+      setEngineers([]);
     } finally {
       setLoading(false);
     }
@@ -99,12 +139,17 @@ export const useEngineers = (companyType: 'own' | 'other') => {
       return null;
     }
 
+    if (!businessClientManager.isAuthenticated()) {
+      toast.error('認証エラー: ログインし直してください');
+      return null;
+    }
+
     try {
       console.log('Creating engineer with data:', engineerData);
-      
+
       // 数据库状态值映射 - 确保只使用数据库允许的日文状态值
       let dbStatus = '提案中'; // 默认状态使用数据库允许的日文值
-      
+
       if (engineerData.status) {
         // 数据库允许的状态值
         const validStatuses = ['提案中', '事前面談', '面談', '結果待ち', '契約中', '営業終了', 'アーカイブ'];
@@ -115,7 +160,7 @@ export const useEngineers = (companyType: 'own' | 'other') => {
           dbStatus = '提案中';
         }
       }
-      
+
       const newEngineer = {
         name: engineerData.name,
         skills: ensureArray(engineerData.skills),
@@ -141,26 +186,30 @@ export const useEngineers = (companyType: 'own' | 'other') => {
         certifications: ensureArray(engineerData.certifications),
         email: engineerData.email || null,
         phone: engineerData.phone || null,
-        tenant_id: currentTenant.id
+        tenant_id: currentTenant.id,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       console.log('Processed engineer data for insert:', newEngineer);
 
-      const { data, error } = await supabase
-        .from('engineers')
-        .insert([newEngineer])
-        .select()
-        .single();
+      const result = await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { data, error } = await client
+          .from('engineers')
+          .insert([newEngineer])
+          .select()
+          .single();
 
-      if (error) {
-        console.error('Database insert error:', error);
-        throw error;
-      }
-      
-      console.log('Successfully created engineer:', data);
+        if (error) throw error;
+        return data;
+      });
+
+      console.log('Successfully created engineer:', result);
       await fetchEngineers(); // 重新获取数据
       toast.success('技術者情報を登録しました');
-      return data;
+      return result;
     } catch (error: any) {
       console.error('Error creating engineer:', error);
       toast.error('技術者情報の登録に失敗しました: ' + error.message);
@@ -170,6 +219,16 @@ export const useEngineers = (companyType: 'own' | 'other') => {
 
   // 更新engineer
   const updateEngineer = async (id: string, engineerData: any) => {
+    if (!currentTenant) {
+      toast.error('テナント情報が見つかりません');
+      return false;
+    }
+
+    if (!businessClientManager.isAuthenticated()) {
+      toast.error('認証エラー: ログインし直してください');
+      return false;
+    }
+
     try {
       console.log('Updating engineer with data:', engineerData);
 
@@ -184,7 +243,7 @@ export const useEngineers = (companyType: 'own' | 'other') => {
           dbStatus = engineerData.status;
         }
       }
-      
+
       // 确保状态值符合数据库约束
       const validStatuses = ['提案中', '事前面談', '面談', '結果待ち', '契約中', '営業終了', 'アーカイブ'];
       if (!validStatuses.includes(dbStatus)) {
@@ -220,16 +279,17 @@ export const useEngineers = (companyType: 'own' | 'other') => {
 
       console.log('Processed engineer data for update:', updatedEngineer);
 
-      const { error } = await supabase
-        .from('engineers')
-        .update(updatedEngineer)
-        .eq('id', id);
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { error } = await client
+          .from('engineers')
+          .update(updatedEngineer)
+          .eq('id', id)
+          .eq('tenant_id', currentTenant.id);
 
-      if (error) {
-        console.error('Database update error:', error);
-        throw error;
-      }
-      
+        if (error) throw error;
+      });
+
       console.log('Successfully updated engineer');
       await fetchEngineers(); // 重新获取数据
       toast.success('技術者情報を更新しました');
@@ -243,22 +303,33 @@ export const useEngineers = (companyType: 'own' | 'other') => {
 
   // 软删除engineer - 设置 is_active = false
   const deleteEngineer = async (id: string) => {
+    if (!currentTenant) {
+      toast.error('テナント情報が見つかりません');
+      return false;
+    }
+
+    if (!businessClientManager.isAuthenticated()) {
+      toast.error('認証エラー: ログインし直してください');
+      return false;
+    }
+
     try {
       console.log('Soft deleting engineer with id:', id);
-      
-      const { error } = await supabase
-        .from('engineers')
-        .update({ 
-          is_active: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
 
-      if (error) {
-        console.error('Error soft deleting engineer:', error);
-        throw error;
-      }
-      
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { error } = await client
+          .from('engineers')
+          .update({
+            is_active: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('tenant_id', currentTenant.id);
+
+        if (error) throw error;
+      });
+
       console.log('Successfully soft deleted engineer');
       await fetchEngineers(); // 重新获取数据
       toast.success('技術者を削除しました');
@@ -270,10 +341,86 @@ export const useEngineers = (companyType: 'own' | 'other') => {
     }
   };
 
+  // 永久删除engineer
+  const permanentlyDeleteEngineer = async (id: string) => {
+    if (!currentTenant) {
+      toast.error('テナント情報が見つかりません');
+      return false;
+    }
+
+    if (!businessClientManager.isAuthenticated()) {
+      toast.error('認証エラー: ログインし直してください');
+      return false;
+    }
+
+    try {
+      console.log('Permanently deleting engineer with id:', id);
+
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { error } = await client
+          .from('engineers')
+          .delete()
+          .eq('id', id)
+          .eq('tenant_id', currentTenant.id);
+
+        if (error) throw error;
+      });
+
+      console.log('Successfully permanently deleted engineer');
+      await fetchEngineers(); // 重新获取数据
+      toast.success('技術者を完全に削除しました');
+      return true;
+    } catch (error: any) {
+      console.error('Error permanently deleting engineer:', error);
+      toast.error('技術者の完全削除に失敗しました');
+      return false;
+    }
+  };
+
+  // 批量操作
+  const batchUpdateEngineers = async (engineerIds: string[], updateData: Partial<DatabaseEngineer>) => {
+    if (!currentTenant || engineerIds.length === 0) {
+      return false;
+    }
+
+    if (!businessClientManager.isAuthenticated()) {
+      toast.error('認証エラー: ログインし直してください');
+      return false;
+    }
+
+    try {
+      await businessClientManager.executeWithRetry(async () => {
+        const client = businessClientManager.getClient();
+        const { error } = await client
+          .from('engineers')
+          .update({
+            ...updateData,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', engineerIds)
+          .eq('tenant_id', currentTenant.id);
+
+        if (error) throw error;
+      });
+
+      await fetchEngineers(); // 重新获取数据
+      toast.success(`${engineerIds.length}件の技術者情報を更新しました`);
+      return true;
+    } catch (error: any) {
+      console.error('Error batch updating engineers:', error);
+      toast.error('技術者情報の一括更新に失敗しました');
+      return false;
+    }
+  };
+
+  // 初始化时获取数据
   useEffect(() => {
     console.log('useEngineers effect triggered - currentTenant:', currentTenant?.id, 'companyType:', companyType);
-    fetchEngineers();
-  }, [currentTenant, companyType]);
+    if (currentTenant && businessClientManager.isAuthenticated()) {
+      fetchEngineers();
+    }
+  }, [currentTenant, companyType, businessClientManager.isAuthenticated()]);
 
   return {
     engineers,
@@ -282,6 +429,8 @@ export const useEngineers = (companyType: 'own' | 'other') => {
     createEngineer,
     updateEngineer,
     deleteEngineer,
+    permanentlyDeleteEngineer,
+    batchUpdateEngineers,
     refetch: fetchEngineers
   };
 };

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { authClient } from '@/integrations/supabase/client'; // 使用认证客户端
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TenantSelector } from '@/components/auth/TenantSelector';
@@ -21,7 +20,7 @@ interface ProfileData {
   company: string | null;
 }
 
-export function Profile() {
+export default function Profile() {
   const { user, profile, currentTenant, signOut } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -45,14 +44,13 @@ export function Profile() {
       });
       setLoading(false);
     } else if (user) {
-      // 如果没有profile但有user，使用auth metadata作为fallback
-      const userData = user.user_metadata;
+      // 如果没有profile但有user，使用基本信息作为fallback
       setProfileData({
-        first_name: userData?.first_name || '',
-        last_name: userData?.last_name || '',
-        avatar_url: userData?.avatar_url || '',
-        job_title: userData?.job_title || '',
-        company: userData?.company || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        avatar_url: user.avatar_url || '',
+        job_title: user.job_title || '',
+        company: user.company || '',
       });
       setLoading(false);
     }
@@ -61,7 +59,7 @@ export function Profile() {
   async function updateProfile() {
     try {
       setUpdating(true);
-      
+
       if (!user) {
         toast({
           title: "エラー",
@@ -71,8 +69,10 @@ export function Profile() {
         return;
       }
 
-      // First check if profile exists
-      const { data: existingProfile, error: checkError } = await supabase
+      console.log('プロファイルを更新中:', user.id);
+
+      // First check if profile exists using authClient
+      const { data: existingProfile, error: checkError } = await authClient
         .from('profiles')
         .select('id')
         .eq('id', user.id)
@@ -100,17 +100,21 @@ export function Profile() {
 
       let result;
       if (existingProfile) {
+        console.log('既存のプロファイルを更新中');
         // Profile exists, use UPDATE
-        result = await supabase
+        result = await authClient
           .from('profiles')
           .update(updateData)
           .eq('id', user.id);
       } else {
+        console.log('新しいプロファイルを作成中');
         // Profile doesn't exist, use INSERT
-        result = await supabase
+        result = await authClient
           .from('profiles')
           .insert({
             id: user.id,
+            email: user.email, // 确保email也被设置
+            role: user.role || 'member', // 确保role也被设置
             ...updateData,
             created_at: new Date().toISOString()
           });
@@ -126,6 +130,7 @@ export function Profile() {
         return;
       }
 
+      console.log('プロファイル更新成功');
       toast({
         title: "更新成功",
         description: "プロファイルが正常に更新されました",
@@ -204,134 +209,160 @@ export function Profile() {
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
                   {profileData.avatar_url ? (
-                    <AvatarImage src={profileData.avatar_url} />
-                  ) : null}
-                  <AvatarFallback className="text-lg">
-                    {`${profileData.first_name?.charAt(0) || ''}${profileData.last_name?.charAt(0) || ''}`}
-                  </AvatarFallback>
+                    <AvatarImage src={profileData.avatar_url} alt="プロファイル画像" />
+                  ) : (
+                    <AvatarFallback className="text-lg font-semibold">
+                      {getInitials() || user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
-                <div className="space-y-2">
-                  <div>
-                    <CardTitle className="japanese-text">個人情報</CardTitle>
-                    <CardDescription className="japanese-text">
-                      プロファイル情報を更新してください
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={profile?.role === 'developer' ? 'destructive' : profile?.role === 'owner' ? 'default' : profile?.role === 'admin' ? 'secondary' : 'outline'} className="japanese-text">
-                      {profile?.role === 'developer' ? '開発者' : profile?.role === 'owner' ? '所有者' : profile?.role === 'admin' ? '管理者' : profile?.role === 'member' ? 'メンバー' : profile?.role === 'viewer' ? '閲覧者' : profile?.role === 'test_user' ? 'テストユーザー' : '不明'}
+                <div>
+                  <h3 className="text-2xl font-semibold japanese-text">
+                    {profileData.first_name && profileData.last_name
+                      ? `${profileData.first_name} ${profileData.last_name}`
+                      : profile?.full_name || user?.email || 'ユーザー'
+                    }
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={getRoleBadgeVariant(user?.role)} className="japanese-text">
+                      {getRoleDisplayName(user?.role)}
                     </Badge>
-                    {profile?.is_test_account && (
+                    {user?.is_test_account && (
                       <Badge variant="outline" className="japanese-text">テストアカウント</Badge>
                     )}
                   </div>
+                  <p className="text-sm text-muted-foreground japanese-text">
+                    {user?.email}
+                  </p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name" className="japanese-text">姓</Label>
-                  <Input
-                    id="first_name"
-                    value={profileData.first_name || ''}
-                    onChange={(e) => setProfileData({...profileData, first_name: e.target.value})}
-                    placeholder="姓"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name" className="japanese-text">名</Label>
-                  <Input
-                    id="last_name"
-                    value={profileData.last_name || ''}
-                    onChange={(e) => setProfileData({...profileData, last_name: e.target.value})}
-                    placeholder="名"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="japanese-text">メールアドレス</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                />
-                <p className="text-sm text-muted-foreground japanese-text">
-                  メールアドレスは変更できません
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="job_title" className="japanese-text">職種</Label>
-                  <Input
-                    id="job_title"
-                    value={profileData.job_title || ''}
-                    onChange={(e) => setProfileData({...profileData, job_title: e.target.value})}
-                    placeholder="採用担当者 / 人事マネージャー"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company" className="japanese-text">会社名</Label>
-                  <Input
-                    id="company"
-                    value={profileData.company || ''}
-                    onChange={(e) => setProfileData({...profileData, company: e.target.value})}
-                    placeholder="会社名"
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={updateProfile} 
-                disabled={updating} 
-                className="japanese-text"
-              >
-                {updating ? '保存中...' : '変更を保存'}
-              </Button>
-            </CardFooter>
           </Card>
 
-          {/* 現在のワークスペース情報 */}
+          {/* テナント情報 */}
           {currentTenant && (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="japanese-text">現在のワークスペース</CardTitle>
-                    <CardDescription className="japanese-text">
-                      ワークスペースの詳細とメンバー管理
-                    </CardDescription>
-                  </div>
-                  {profile?.role && ['owner', 'admin'].includes(profile.role) && (
-                    <InviteUserDialog />
-                  )}
-                </div>
+                <CardTitle className="japanese-text">現在のテナント</CardTitle>
+                <CardDescription className="japanese-text">
+                  所属しているテナントの情報
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <CardContent>
+                <div className="space-y-2">
                   <div>
-                    <Label className="japanese-text">ワークスペース名</Label>
+                    <Label className="japanese-text">テナント名</Label>
                     <p className="text-sm font-medium">{currentTenant.name}</p>
                   </div>
                   <div>
                     <Label className="japanese-text">タイプ</Label>
-                    <p className="text-sm font-medium">
-                      {currentTenant.type === 'enterprise' ? '企業' : '個人'}
+                    <p className="text-sm">
+                      {currentTenant.tenant_type === 'personal' ? '個人' :
+                        currentTenant.tenant_type === 'enterprise' ? '企業' :
+                          currentTenant.tenant_type}
                     </p>
                   </div>
+                  {currentTenant.company_name && (
+                    <div>
+                      <Label className="japanese-text">会社名</Label>
+                      <p className="text-sm">{currentTenant.company_name}</p>
+                    </div>
+                  )}
                   {currentTenant.domain && (
                     <div>
                       <Label className="japanese-text">ドメイン</Label>
-                      <p className="text-sm font-medium">{currentTenant.domain}</p>
+                      <p className="text-sm">{currentTenant.domain}</p>
                     </div>
                   )}
-                  <div>
-                    <Label className="japanese-text">サブスクリプションプラン</Label>
-                    <p className="text-sm font-medium">{currentTenant.subscription_plan || 'Free'}</p>
-                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* プロファイル編集フォーム */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="japanese-text">プロファイル編集</CardTitle>
+              <CardDescription className="japanese-text">
+                あなたの個人情報を更新してください
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first_name" className="japanese-text">名前</Label>
+                  <Input
+                    id="first_name"
+                    value={profileData.first_name || ''}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                    className="japanese-text"
+                    placeholder="太郎"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="last_name" className="japanese-text">姓</Label>
+                  <Input
+                    id="last_name"
+                    value={profileData.last_name || ''}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                    className="japanese-text"
+                    placeholder="田中"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="job_title" className="japanese-text">職種</Label>
+                <Input
+                  id="job_title"
+                  value={profileData.job_title || ''}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, job_title: e.target.value }))}
+                  className="japanese-text"
+                  placeholder="ソフトウェアエンジニア"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="company" className="japanese-text">会社名</Label>
+                <Input
+                  id="company"
+                  value={profileData.company || ''}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, company: e.target.value }))}
+                  className="japanese-text"
+                  placeholder="株式会社サンプル"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="avatar_url" className="japanese-text">プロファイル画像URL</Label>
+                <Input
+                  id="avatar_url"
+                  type="url"
+                  value={profileData.avatar_url || ''}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, avatar_url: e.target.value }))}
+                  className="japanese-text"
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={updateProfile} disabled={updating} className="japanese-text">
+                {updating ? '更新中...' : 'プロファイルを更新'}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* ユーザー招待（管理者のみ） */}
+          {(user?.role === 'admin' || user?.role === 'owner') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="japanese-text">ユーザー管理</CardTitle>
+                <CardDescription className="japanese-text">
+                  新しいユーザーをテナントに招待
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InviteUserDialog />
               </CardContent>
             </Card>
           )}
@@ -340,5 +371,3 @@ export function Profile() {
     </MainLayout>
   );
 }
-
-export default Profile;

@@ -13,7 +13,8 @@ import {
 import {
   setBusinessClientToken,
   clearBusinessClientAuth,
-  initializeBusinessClient
+  initializeBusinessClient,
+  businessClientManager
 } from '@/integrations/supabase/business-client';
 
 // ユーザー情報の型定義
@@ -27,13 +28,19 @@ interface User {
   avatar_url?: string;
   tenant_id: string;
   is_active: boolean;
+  // 追加のフィールド
+  job_title?: string;
+  company?: string;
+  is_test_account?: boolean;
+  permissions?: any;
+  last_login_at?: string;
 }
 
 // テナント情報の型定義
 interface Tenant {
   id: string;
   name: string;
-  tenant_type: 'individual' | 'enterprise' | 'company';
+  tenant_type: 'personal' | 'enterprise';
   domain?: string;
   is_active: boolean;
   subscription_plan?: string;
@@ -83,7 +90,7 @@ interface AuthContextType {
 
   // テナント管理
   switchTenant: (tenantId: string) => Promise<void>;
-  createTenant: (name: string, type: 'individual' | 'enterprise' | 'company', domain?: string) => Promise<{ error: Error | null }>;
+  createTenant: (name: string, type: 'personal' | 'enterprise', domain?: string) => Promise<{ error: Error | null }>;
   inviteUser: (email: string, role: string, tenantId: string) => Promise<{ error: Error | null }>;
 
   // トークン管理
@@ -93,44 +100,58 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth は AuthProvider 内で使用する必要があります');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   // 状態管理
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 初期化：保存されたトークンと認証状態の復元
+  // 初期化処理
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('認証システムを初期化中...');
-
       try {
+        console.log('認証システムを初期化中...');
+
         const { accessToken, refreshToken } = getStoredTokens();
 
         if (accessToken) {
-          console.log('保存されたトークンを発見、検証中...');
+          console.log('保存されたトークンが見つかりました');
 
-          // トークンの検証
+          // トークンの有効性を確認
           const verifyResult = await verifyToken(accessToken);
 
           if (verifyResult.success && verifyResult.data) {
-            // 有効なトークンの場合
-            console.log('トークンが有効、ユーザー情報を設定中...');
+            console.log('保存されたトークンが有効です');
             await setAuthenticatedUser(verifyResult.data, accessToken);
           } else if (refreshToken) {
-            // アクセストークンが無効でリフレッシュトークンがある場合
             console.log('アクセストークンが無効、リフレッシュを試行中...');
+
+            // リフレッシュトークンで新しいアクセストークンを取得
             const refreshResult = await apiRefreshToken(refreshToken);
 
             if (refreshResult.success && refreshResult.data) {
               console.log('トークンリフレッシュ成功');
               const newAccessToken = refreshResult.data.access_token;
+
+              // 新しいトークンを保存
               saveTokens(newAccessToken, refreshToken);
 
-              // 新しいトークンで再検証
+              // 新しいトークンで認証情報を確認
               const newVerifyResult = await verifyToken(newAccessToken);
               if (newVerifyResult.success && newVerifyResult.data) {
                 await setAuthenticatedUser(newVerifyResult.data, newAccessToken);
@@ -171,6 +192,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar_url: authData.user.avatar_url,
         tenant_id: authData.user.tenant_id,
         is_active: true,
+        // 追加フィールド
+        job_title: authData.user.job_title,
+        company: authData.user.company,
+        is_test_account: authData.user.is_test_account,
+        permissions: authData.user.permissions,
+        last_login_at: authData.user.last_login_at,
       };
 
       // プロファイル情報の設定（後方互換性）
@@ -282,79 +309,90 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // サインアップ機能（将来の拡張のため）
   const signUp = async (email: string, password: string, userData?: any): Promise<{ error: Error | null }> => {
-    // 現在はidentity-hub-controlでのサインアップ機能は実装されていない
-    // 必要に応じて後で実装
-    toast({
-      title: "機能未実装",
-      description: "サインアップ機能は現在開発中です",
-      variant: "destructive",
-    });
-    return { error: new Error('サインアップ機能は未実装です') };
-  };
+    try {
+      setLoading(true);
+      console.log('サインアップ機能は現在実装されていません');
 
-  // Googleログイン（将来の拡張のため）
-  const signInWithGoogle = async (): Promise<void> => {
-    toast({
-      title: "機能未実装",
-      description: "Googleログイン機能は現在開発中です",
-      variant: "destructive",
-    });
+      toast({
+        title: "未実装",
+        description: "サインアップ機能は現在利用できません",
+        variant: "destructive",
+      });
+
+      return { error: new Error('サインアップ機能は現在実装されていません') };
+    } catch (error) {
+      console.error('サインアップエラー:', error);
+      return { error: error as Error };
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ログアウト機能
-  const signOut = async (): Promise<void> => {
+  const signOut = async () => {
     try {
-      console.log('ログアウト処理開始');
+      setLoading(true);
+      console.log('ログアウト処理中...');
 
-      if (token) {
-        // サーバー側でトークンを無効化
-        await authLogout(token);
+      // サーバーサイドでのログアウト処理
+      const { refreshToken } = getStoredTokens();
+      if (refreshToken) {
+        try {
+          await authLogout(refreshToken);
+        } catch (error) {
+          console.error('サーバーサイドログアウトエラー:', error);
+          // エラーがあってもクライアントサイドのクリアは実行
+        }
       }
 
-      // 認証状態をクリア
+      // クライアントサイドの状態クリア
       await clearAuthState();
 
       toast({
-        title: "ログアウト",
-        description: "正常にログアウトしました",
+        title: "ログアウト完了",
+        description: "またのご利用をお待ちしております",
       });
 
       console.log('ログアウト完了');
     } catch (error) {
       console.error('ログアウトエラー:', error);
-      // エラーがあってもローカル状態はクリア
+      // エラーがあってもクライアントサイドのクリアは実行
       await clearAuthState();
+    } finally {
+      setLoading(false);
     }
   };
 
-  // テナント切り替え機能（将来の拡張のため）
-  const switchTenant = async (tenantId: string): Promise<void> => {
-    // 複数テナント対応は将来の拡張
-    console.log('テナント切り替え:', tenantId);
+  // Google ログイン（将来の拡張のため）
+  const signInWithGoogle = async () => {
+    console.log('Google ログイン機能は現在実装されていません');
     toast({
-      title: "機能準備中",
-      description: "テナント切り替え機能は準備中です",
+      title: "未実装",
+      description: "Google ログイン機能は現在利用できません",
+      variant: "destructive",
     });
   };
 
-  // テナント作成機能（将来の拡張のため）
-  const createTenant = async (name: string, type: 'individual' | 'enterprise' | 'company', domain?: string): Promise<{ error: Error | null }> => {
-    console.log('テナント作成:', name, type);
+  // テナント切り替え（将来の拡張のため）
+  const switchTenant = async (tenantId: string) => {
+    console.log('テナント切り替え機能は現在実装されていません');
     toast({
-      title: "機能準備中",
-      description: "テナント作成機能は準備中です",
+      title: "未実装",
+      description: "テナント切り替え機能は現在利用できません",
+      variant: "destructive",
     });
-    return { error: new Error('テナント作成機能は未実装です') };
   };
 
-  // ユーザー招待機能（将来の拡張のため）
+  // テナント作成（将来の拡張のため）
+  const createTenant = async (name: string, type: 'personal' | 'enterprise', domain?: string): Promise<{ error: Error | null }> => {
+    console.log('テナント作成機能は現在実装されていません');
+    return { error: new Error('テナント作成機能は現在実装されていません') };
+  };
+
+  // ユーザー招待（将来の拡張のため）
   const inviteUser = async (email: string, role: string, tenantId: string): Promise<{ error: Error | null }> => {
-    console.log('ユーザー招待:', email, role, tenantId);
-    toast({
-      title: "機能準備中",
-      description: "ユーザー招待機能は準備中です",
-    });
-    return { error: new Error('ユーザー招待機能は未実装です') };
+    console.log('ユーザー招待機能は現在実装されていません');
+    return { error: new Error('ユーザー招待機能は現在実装されていません') };
   };
 
   // トークンリフレッシュ
@@ -363,36 +401,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { refreshToken: storedRefreshToken } = getStoredTokens();
 
       if (!storedRefreshToken) {
-        return { success: false, error: 'リフレッシュトークンが見つかりません' };
+        return { success: false, error: 'リフレッシュトークンがありません' };
       }
 
       const result = await apiRefreshToken(storedRefreshToken);
 
       if (result.success && result.data) {
-        const newAccessToken = result.data.access_token;
-        saveTokens(newAccessToken, storedRefreshToken);
-        setToken(newAccessToken);
-        await setBusinessClientToken(newAccessToken);
+        // 新しいトークンを保存
+        saveTokens(result.data.access_token, storedRefreshToken);
+        setToken(result.data.access_token);
 
-        console.log('トークンリフレッシュ成功');
+        // 業務クライアントのトークンも更新
+        await setBusinessClientToken(result.data.access_token, storedRefreshToken);
+
         return { success: true };
       } else {
-        console.error('トークンリフレッシュ失敗:', result.message);
-        await clearAuthState();
-        return { success: false, error: result.message };
+        return { success: false, error: result.message || 'トークンリフレッシュに失敗しました' };
       }
     } catch (error) {
       console.error('トークンリフレッシュエラー:', error);
-      await clearAuthState();
-      return { success: false, error: 'トークンリフレッシュに失敗しました' };
+      return { success: false, error: 'トークンリフレッシュ中にエラーが発生しました' };
     }
   };
 
-  // 現在のトークン検証
+  // 現在のトークンの検証
   const verifyCurrentToken = async (): Promise<{ valid: boolean; error?: string }> => {
     try {
       if (!token) {
-        return { valid: false, error: 'トークンが存在しません' };
+        return { valid: false, error: 'トークンがありません' };
       }
 
       const result = await verifyToken(token);
@@ -400,68 +436,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         return { valid: true };
       } else {
-        return { valid: false, error: result.message };
+        return { valid: false, error: result.message || 'トークンが無効です' };
       }
     } catch (error) {
       console.error('トークン検証エラー:', error);
-      return { valid: false, error: 'トークン検証に失敗しました' };
+      return { valid: false, error: 'トークン検証中にエラーが発生しました' };
     }
   };
 
-  // 定期的なトークンリフレッシュ（7時間ごと）
-  useEffect(() => {
-    if (!token) return;
+  // session は後方互換性のため user と同じ値を返す
+  const session = user ? { user } : null;
 
-    const interval = setInterval(async () => {
-      console.log('定期トークンリフレッシュを実行');
-      await refreshToken();
-    }, 7 * 60 * 60 * 1000); // 7時間
-
-    return () => clearInterval(interval);
-  }, [token]);
-
-  // コンテキスト値
-  const contextValue: AuthContextType = {
-    // ユーザー情報
+  const value: AuthContextType = {
     user,
     profile,
-    session: { user, access_token: token }, // 後方互換性
-
-    // テナント情報  
+    session,
     currentTenant,
     tenants,
-
-    // 状態
     loading,
     token,
-
-    // 認証アクション
     signIn,
     signUp,
     signOut,
     signInWithGoogle,
-
-    // テナント管理
     switchTenant,
     createTenant,
     inviteUser,
-
-    // トークン管理
     refreshToken,
     verifyCurrentToken,
   };
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth は AuthProvider 内で使用する必要があります');
-  }
-  return context;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

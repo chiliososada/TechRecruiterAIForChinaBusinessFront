@@ -235,5 +235,5 @@ export interface ProjectEngineerMatchRow {
 }
 
 // 其他類型定義...
-export type TenantType = "individual" | "enterprise" | "company"
+export type TenantType = "personal" | "enterprise"
 export type UserRole = "owner" | "admin" | "member" | "viewer" | "test_user" | "developer" | "manager"
