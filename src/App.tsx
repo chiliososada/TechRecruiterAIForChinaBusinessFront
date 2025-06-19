@@ -18,6 +18,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ToastProvider } from "@/hooks/toast/toast-provider";
 
+import AuthDebug from "./pages/Auth";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -37,22 +39,22 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
-              
+
               {/* Protected routes */}
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              
+
               {/* Own company routes */}
               <Route path="/cases/company/own" element={<ProtectedRoute><Cases companyType="own" /></ProtectedRoute>} />
               <Route path="/candidates/company/own" element={<ProtectedRoute><Candidates companyType="own" /></ProtectedRoute>} />
-              
+
               {/* Other company routes */}
               <Route path="/cases/company/other" element={<ProtectedRoute><Cases companyType="other" /></ProtectedRoute>} />
               <Route path="/candidates/company/other" element={<ProtectedRoute><Candidates companyType="other" /></ProtectedRoute>} />
-              
+
               {/* Legacy route - redirect handling */}
               <Route path="/cases" element={<ProtectedRoute><Navigate to="/cases/company/own" replace /></ProtectedRoute>} />
               <Route path="/candidates" element={<ProtectedRoute><Navigate to="/candidates/company/own" replace /></ProtectedRoute>} />
-              
+
               {/* Other routes */}
               <Route path="/matching" element={<ProtectedRoute><Matching /></ProtectedRoute>} />
               <Route path="/batch-matching" element={<ProtectedRoute><BatchMatching /></ProtectedRoute>} />
@@ -61,6 +63,9 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
+              <Route path="/auth-debug" element={<AuthDebug />} />
+
+
             </Routes>
           </BrowserRouter>
         </AuthProvider>

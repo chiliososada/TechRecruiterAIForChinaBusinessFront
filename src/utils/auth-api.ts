@@ -44,6 +44,8 @@ export interface RefreshTokenResponse {
 // ログイン API呼び出し
 export const authLogin = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
+        console.log('認証ログイン試行:', credentials.email);
+
         const response = await fetch(`${AUTH_API_BASE}/auth-login`, {
             method: 'POST',
             headers: {
@@ -51,16 +53,64 @@ export const authLogin = async (credentials: LoginCredentials): Promise<AuthResp
                 'Authorization': `Bearer ${AUTH_ANON_KEY}`,
                 'apikey': AUTH_ANON_KEY,
             },
-            body: JSON.stringify(credentials),
+            body: JSON.stringify({
+                email: credentials.email,
+                password: credentials.password,
+                tenant_id: credentials.tenant_id,
+                device_name: 'Web Browser'
+            }),
         });
 
-        const data = await response.json();
+        console.log('認証API応答:', response.status, response.statusText);
 
-        if (!response.ok) {
-            throw new Error(data.message || 'ログインに失敗しました');
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            console.error('JSON解析エラー:', jsonError);
+            return {
+                success: false,
+                message: 'サーバーからの応答が無効です'
+            };
         }
 
-        return data;
+        console.log('認証API応答データ:', data);
+
+        if (!response.ok) {
+            return {
+                success: false,
+                message: data.error || `HTTP Error: ${response.status}`
+            };
+        }
+
+        if (data.error) {
+            return {
+                success: false,
+                message: data.error
+            };
+        }
+
+        // 成功レスポンスの構造を調整
+        return {
+            success: true,
+            message: 'ログイン成功',
+            data: {
+                access_token: data.access_token,
+                refresh_token: data.refresh_token || '', // リフレッシュトークンがない場合は空文字
+                user: {
+                    id: data.user.id,
+                    email: data.user.email,
+                    full_name: data.user.full_name,
+                    tenant_id: data.user.tenant_id || '',
+                    role: data.user.role || 'member'
+                },
+                tenant: data.tenant || {
+                    id: data.user.tenant_id || '',
+                    name: 'Default Tenant',
+                    tenant_type: 'individual'
+                }
+            }
+        };
     } catch (error) {
         console.error('認証ログインエラー:', error);
         return {
