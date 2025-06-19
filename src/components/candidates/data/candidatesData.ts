@@ -1,0 +1,62 @@
+
+import { Engineer } from '../types';
+
+export const candidatesData: Engineer[] = [
+  {
+    id: '1',
+    name: '山田太郎',
+    skills: ['JavaScript', 'React', 'Node.js'],
+    japaneseLevel: 'ネイティブレベル',
+    experience: '5年',
+    availability: '即日',
+    status: ['提案中', '事前面談'],  // Multiple statuses
+    remarks: '週4日勤務希望, 出張可, リモート可',
+    companyType: '自社',
+    companyName: 'テックイノベーション株式会社',
+    source: '直接応募',
+    registeredAt: '2023-01-15',
+    updatedAt: '2023-03-20',
+    nationality: '日本',
+    age: '32歳',
+    gender: '男性',
+    nearestStation: '品川駅',
+  },
+  {
+    id: '2',
+    name: '鈴木花子',
+    skills: ['Python', 'Django', 'AWS'],
+    japaneseLevel: 'ネイティブレベル',
+    experience: '3年',
+    availability: '1ヶ月後',
+    status: ['面談', '結果待ち'],  // Multiple statuses
+    remarks: 'リモート勤務希望, 週5日可',
+    companyType: '他社',
+    companyName: 'フロントエンドパートナーズ株式会社',
+    source: 'エージェント紹介',
+    registeredAt: '2023-02-20',
+    updatedAt: '2023-04-15',
+    nationality: '中国',
+    age: '28歳',
+    gender: '女性',
+    nearestStation: '東京駅',
+  },
+  {
+    id: '3',
+    name: '田中誠',
+    skills: ['Java', 'Spring Boot', 'Oracle'],
+    japaneseLevel: 'ビジネスレベル',
+    experience: '8年',
+    availability: '応相談',
+    status: ['営業終了'],
+    remarks: '大手企業での勤務経験豊富, 長期案件希望',
+    companyType: '自社',
+    companyName: 'テックイノベーション株式会社',
+    source: '直接応募',
+    registeredAt: '2023-03-05',
+    updatedAt: '2023-05-10',
+    nationality: 'インド',
+    age: '35歳',
+    gender: '男性',
+    nearestStation: '新宿駅',
+  }
+];
