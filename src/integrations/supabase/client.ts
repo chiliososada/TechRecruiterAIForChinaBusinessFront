@@ -1,14 +1,41 @@
-// 改進されたSupabase認証システム統合 - 分離版
+// 改進されたSupabase認証システム統合 - 環境変数対応版
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// 認証システム用Supabase設定 (identity-hub-control)
-const AUTH_SUPABASE_URL = "https://fuetincqvlvcptnzpood.supabase.co";
-const AUTH_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZXRpbmNxdmx2Y3B0bnpwb29kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyMjQ1MzYsImV4cCI6MjA2NTgwMDUzNn0.2NS-yPcV5W7BwQ4Eig6FOhH2lCOOAl9w9BC0kqZ9q3I";
+// 環境変数から設定を取得
+const getEnvVar = (key: string, fallback?: string): string => {
+  if (typeof window !== 'undefined') {
+    // ブラウザ環境では process.env は利用できないことがある
+    return (process.env as any)[key] || fallback || '';
+  }
+  return process.env[key] || fallback || '';
+};
 
-// 業務データベース用Supabase設定
-const BUSINESS_SUPABASE_URL = "https://aasiwxtosnmvjupikjvs.supabase.co";
-const BUSINESS_SUPABASE_ANON_KEY = "YOUR_BUSINESS_ANON_KEY_HERE"; // 既に更新済み
+// 認証システム用Supabase設定 (identity-hub-control) - 環境変数必須
+const AUTH_SUPABASE_URL = getEnvVar('NEXT_PUBLIC_AUTH_SUPABASE_URL');
+const AUTH_SUPABASE_ANON_KEY = getEnvVar('NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY');
+
+// 業務データベース用Supabase設定 (新しいデータベース) - 環境変数必須
+const BUSINESS_SUPABASE_URL = getEnvVar('NEXT_PUBLIC_BUSINESS_SUPABASE_URL');
+const BUSINESS_SUPABASE_ANON_KEY = getEnvVar('NEXT_PUBLIC_BUSINESS_SUPABASE_ANON_KEY');
+
+// 必須設定のチェック
+if (!AUTH_SUPABASE_URL || !AUTH_SUPABASE_ANON_KEY) {
+  throw new Error('認証システム用Supabase設定が不完全です。NEXT_PUBLIC_AUTH_SUPABASE_URL と NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY を環境変数に設定してください。');
+}
+
+if (!BUSINESS_SUPABASE_URL || !BUSINESS_SUPABASE_ANON_KEY) {
+  throw new Error('業務データベース用Supabase設定が不完全です。NEXT_PUBLIC_BUSINESS_SUPABASE_URL と NEXT_PUBLIC_BUSINESS_SUPABASE_ANON_KEY を環境変数に設定してください。');
+}
+
+// 開発環境での設定チェック
+if (process.env.NODE_ENV === 'development') {
+  console.log('Supabase設定確認:');
+  console.log('認証DB URL:', AUTH_SUPABASE_URL);
+  console.log('認証DB キー:', AUTH_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
+  console.log('業務DB URL:', BUSINESS_SUPABASE_URL);
+  console.log('業務DB キー:', BUSINESS_SUPABASE_ANON_KEY !== 'YOUR_BUSINESS_ANON_KEY_PLACEHOLDER' ? 'セット済み' : '未設定');
+}
 
 // 認証専用クライアント（identity-hub-control用）
 export const authClient = createClient(
@@ -16,7 +43,7 @@ export const authClient = createClient(
   AUTH_SUPABASE_ANON_KEY,
   {
     auth: {
-      storage: localStorage,
+      storage: typeof window !== 'undefined' ? localStorage : undefined,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
@@ -156,6 +183,8 @@ export const supabase = businessClient;
 export const getAuthStatus = () => {
   return {
     hasAuthToken: businessClient.hasValidToken(),
-    isAuthenticated: businessClient.isAuthenticated()
+    isAuthenticated: businessClient.isAuthenticated(),
+    authClientReady: !!AUTH_SUPABASE_URL && !!AUTH_SUPABASE_ANON_KEY,
+    businessClientReady: !!BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY !== 'YOUR_BUSINESS_ANON_KEY_PLACEHOLDER'
   };
 };
