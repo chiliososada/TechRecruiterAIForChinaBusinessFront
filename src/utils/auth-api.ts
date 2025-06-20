@@ -1,9 +1,17 @@
 // 認証システムAPI統合用ヘルパー関数
 import { authClient } from '@/integrations/supabase/client';
 
+// 環境変数から取得するように変更（ハードコードを避ける）
+const getEnvVar = (key: string, fallback?: string): string => {
+    if (typeof window !== 'undefined') {
+        return (import.meta.env[key] || fallback || '');
+    }
+    return process.env[key] || fallback || '';
+};
+
 // 認証APIのベースURL (identity-hub-control Edge Functions)
-const AUTH_API_BASE = 'https://fuetincqvlvcptnzpood.supabase.co/functions/v1';
-const AUTH_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZXRpbmNxdmx2Y3B0bnpwb29kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyMjQ1MzYsImV4cCI6MjA2NTgwMDUzNn0.2NS-yPcV5W7BwQ4Eig6FOhH2lCOOAl9w9BC0kqZ9q3I';
+const AUTH_API_BASE = getEnvVar('VITE_API_BASE_URL', 'https://fuetincqvlvcptnzpood.supabase.co/functions/v1');
+const AUTH_ANON_KEY = getEnvVar('VITE_AUTH_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZXRpbmNxdmx2Y3B0bnpwb29kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyMjQ1MzYsImV4cCI6MjA2NTgwMDUzNn0.2NS-yPcV5W7BwQ4Eig6FOhH2lCOOAl9w9BC0kqZ9q3I');
 
 export interface LoginCredentials {
     email: string;
