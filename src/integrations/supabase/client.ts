@@ -1,4 +1,4 @@
-// 改進されたSupabase認証システム統合 - 環境変数対応版
+// 改進されたSupabase認証システム統合 - 環境変数対応版（API Key方式）
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -57,12 +57,13 @@ export const authClient = AUTH_SUPABASE_URL && AUTH_SUPABASE_ANON_KEY ? createCl
   }
 ) : null;
 
-// 業務データ専用クライアント - JWT認証対応
+// 業務データ専用クライアント - API Key方式（簡化版）
 class BusinessSupabaseClient {
   private client: ReturnType<typeof createClient<Database>>;
-  private currentToken: string | null = null;
+  private isReady = false;
 
   constructor() {
+    // Postman方式でクライアントを作成
     this.client = createClient<Database>(
       BUSINESS_SUPABASE_URL,
       BUSINESS_SUPABASE_ANON_KEY,
@@ -73,110 +74,76 @@ class BusinessSupabaseClient {
           detectSessionInUrl: false,
         },
         global: {
-          headers: {},
+          headers: {
+            'apikey': BUSINESS_SUPABASE_ANON_KEY, // 重要：APIキーヘッダー
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Prefer': 'return=representation'
+          }
         }
       }
     );
+
+    this.isReady = true;
+    console.log('業務クライアントが作成されました（API Key方式）');
   }
 
-  // JWT トークンを設定
+  // 簡化版：認証設定は不要
   setAuth(token: string | null) {
-    this.currentToken = token;
-    // Supabaseの組み込みメソッドを使用してトークンを設定
-    if (token) {
-      // 新しいクライアントインスタンスを作成してトークンを設定
-      this.client = createClient<Database>(
-        BUSINESS_SUPABASE_URL,
-        BUSINESS_SUPABASE_ANON_KEY,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false,
-          },
-          global: {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
-        }
-      );
-    } else {
-      // トークンなしのクライアントに戻す
-      this.client = createClient<Database>(
-        BUSINESS_SUPABASE_URL,
-        BUSINESS_SUPABASE_ANON_KEY,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false,
-          }
-        }
-      );
-    }
+    // API Key方式では何もしない（互換性のために残す）
+    console.log('API Key方式のため、setAuth()は何も行いません');
   }
 
-  // トークンの有効性を確認
+  // 簡化版：常にtrue
   public hasValidToken(): boolean {
-    return !!this.currentToken;
+    return this.isReady;
   }
 
-  // テーブルアクセス
-  from<TableName extends keyof Database['public']['Tables']>(
-    table: TableName
-  ) {
-    if (!this.currentToken) {
-      throw new Error('認証トークンが設定されていません。ログインしてください。');
-    }
+  // テーブルアクセス：認証チェック不要
+  from<TableName extends keyof Database['public']['Tables']>(table: TableName) {
     return this.client.from(table);
   }
 
-  // RPC コール
-  rpc(
-    fn: string,
-    args?: any
-  ) {
-    if (!this.currentToken) {
-      throw new Error('認証トークンが設定されていません。ログインしてください。');
-    }
+  // RPC コール：認証チェック不要
+  rpc(fn: string, args?: any) {
     return (this.client as any).rpc(fn, args);
   }
 
-  // ストレージアクセス
+  // ストレージアクセス：認証チェック不要
   get storage() {
-    if (!this.currentToken) {
-      throw new Error('認証トークンが設定されていません。ログインしてください。');
-    }
     return this.client.storage;
   }
 
-  // Functions アクセス
+  // Functions アクセス：認証チェック不要
   get functions() {
-    if (!this.currentToken) {
-      throw new Error('認証トークンが設定されていません。ログインしてください。');
-    }
     return this.client.functions;
   }
 
-  // 認証状態のチェック
+  // 認証状態のチェック：常にtrue
   isAuthenticated(): boolean {
-    return this.hasValidToken();
+    return this.isReady;
   }
 
-  // クライアントインスタンスの取得（内部使用）
+  // クライアントインスタンスの取得
   getClient() {
     return this.client;
+  }
+
+  // 互換性のために残す（API Key方式では意味なし）
+  getCurrentToken(): string | null {
+    return null;
   }
 }
 
 // 業務クライアントのシングルトンインスタンス（businessClientとしてエクスポート）
 export const businessClient = BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY ? new BusinessSupabaseClient() : null;
 
-// 便利関数 - setBusinessClientAuth を追加
+// 便利関数 - 互換性のために残す
 export const setBusinessClientAuth = (token: string | null) => {
   if (businessClient) {
     businessClient.setAuth(token);
+  } else {
+    console.error('業務クライアントが利用できません');
   }
 };
 
@@ -229,14 +196,8 @@ export const setCurrentTenant = (tenantId: string) => {
     );
   }
 
-  if (BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY && businessClient) {
-    // ビジネスクライアントも新しいテナントIDで再作成が必要な場合
-    // 現在のトークンを保持
-    const currentToken = businessClient.hasValidToken() ? 'current_token' : null;
-    if (currentToken) {
-      businessClient.setAuth(currentToken);
-    }
-  }
+  // API Key方式では特に何もしない
+  console.log('API Key方式のため、テナント切替は設定ファイルで管理してください');
 };
 
 // 認証状態の取得
@@ -245,6 +206,7 @@ export const getAuthStatus = () => {
     hasAuthToken: businessClient ? businessClient.hasValidToken() : false,
     isAuthenticated: businessClient ? businessClient.isAuthenticated() : false,
     authClientReady: !!AUTH_SUPABASE_URL && !!AUTH_SUPABASE_ANON_KEY,
-    businessClientReady: !!BUSINESS_SUPABASE_URL && !!BUSINESS_SUPABASE_ANON_KEY
+    businessClientReady: !!BUSINESS_SUPABASE_URL && !!BUSINESS_SUPABASE_ANON_KEY,
+    currentToken: 'API Key方式（トークン不要）'
   };
 };

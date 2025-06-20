@@ -1,4 +1,4 @@
-// デバッグパネルコンポーネント（開発環境のみ表示）
+// デバッグパネルコンポーネント（開発環境のみ表示）- 简化版
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,15 +17,22 @@ export const DebugPanel: React.FC = () => {
     }
 
     const runConnectionTest = async () => {
-        const { accessToken, refreshToken } = getStoredTokens();
+        const { accessToken } = getStoredTokens(); // refreshToken 削除
 
         const results = {
             hasAccessToken: !!accessToken,
-            hasRefreshToken: !!refreshToken,
+            // hasRefreshToken 削除
             isBusinessAuthenticated: businessClientManager.isAuthenticated(),
             user: user ? { id: user.id, email: user.email } : null,
             tenant: currentTenant ? { id: currentTenant.id, name: currentTenant.name } : null,
-            connectionTest: null as any
+            connectionTest: null as any,
+            // 環境変数チェック追加
+            envCheck: {
+                authUrl: !!import.meta.env.VITE_AUTH_SUPABASE_URL,
+                authKey: !!import.meta.env.VITE_AUTH_SUPABASE_ANON_KEY,
+                businessUrl: !!import.meta.env.VITE_BUSINESS_SUPABASE_URL,
+                businessKey: !!import.meta.env.VITE_BUSINESS_SUPABASE_ANON_KEY
+            }
         };
 
         if (businessClientManager.isAuthenticated()) {
@@ -59,7 +66,7 @@ export const DebugPanel: React.FC = () => {
             <Card className="bg-yellow-50 border-yellow-200">
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex justify-between items-center">
-                        開発デバッグパネル
+                        開発デバッグパネル（简化版）
                         <Button
                             onClick={() => setIsOpen(false)}
                             variant="ghost"
@@ -101,9 +108,7 @@ export const DebugPanel: React.FC = () => {
                             <div>
                                 アクセストークン: {testResults.hasAccessToken ? '✅' : '❌'}
                             </div>
-                            <div>
-                                リフレッシュトークン: {testResults.hasRefreshToken ? '✅' : '❌'}
-                            </div>
+                            {/* リフレッシュトークン行を削除 */}
                             <div>
                                 業務DB認証: {testResults.isBusinessAuthenticated ? '✅' : '❌'}
                             </div>
@@ -123,11 +128,23 @@ export const DebugPanel: React.FC = () => {
                                     )}
                                 </div>
                             )}
+
+                            {/* 新增：環境変数チェック */}
+                            <div className="mt-2 pt-1 border-t border-gray-200">
+                                <div className="text-xs font-semibold mb-1">環境変数:</div>
+                                <div className="grid grid-cols-2 gap-1 text-xs">
+                                    <div>認証URL: {testResults.envCheck.authUrl ? '✅' : '❌'}</div>
+                                    <div>認証Key: {testResults.envCheck.authKey ? '✅' : '❌'}</div>
+                                    <div>業務URL: {testResults.envCheck.businessUrl ? '✅' : '❌'}</div>
+                                    <div>業務Key: {testResults.envCheck.businessKey ? '✅' : '❌'}</div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     <div className="text-xs text-gray-500 mt-2">
-                        <div>環境: {process.env.NODE_ENV}</div>
+                        <div>環境: {import.meta.env.MODE || 'development'}</div>
+                        <div>構成: API Key方式（簡化版）</div>
                         <div>時刻: {new Date().toLocaleString('ja-JP')}</div>
                     </div>
                 </CardContent>

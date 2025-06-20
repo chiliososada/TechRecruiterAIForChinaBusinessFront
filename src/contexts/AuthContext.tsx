@@ -8,7 +8,9 @@ import {
   getStoredTokens,
   saveTokens,
   clearStoredTokens,
-  type AuthResponse
+  type AuthResponse,
+  type RefreshTokenResponse,
+  type LoginCredentials
 } from '@/utils/auth-api';
 import {
   setBusinessClientToken,
@@ -98,74 +100,60 @@ interface AuthContextType {
   verifyCurrentToken: () => Promise<{ valid: boolean; error?: string }>;
 }
 
+// コンテキストの作成
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth は AuthProvider 内で使用する必要があります');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+// AuthProvider コンポーネント
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // 状態管理
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
 
-  // 初期化処理
+  // 初期化処理 - 修正版
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('認証システムを初期化中...');
-
         const { accessToken, refreshToken } = getStoredTokens();
 
         if (accessToken) {
-          console.log('保存されたトークンが見つかりました');
+          console.log('保存されたトークンが見つかりました、検証中...');
 
-          // トークンの有効性を確認
+          // トークンの検証
           const verifyResult = await verifyToken(accessToken);
 
           if (verifyResult.success && verifyResult.data) {
-            console.log('保存されたトークンが有効です');
+            console.log('トークンが有効です、ユーザー情報を設定中...');
             await setAuthenticatedUser(verifyResult.data, accessToken);
           } else if (refreshToken) {
-            console.log('アクセストークンが無効、リフレッシュを試行中...');
+            console.log('アクセストークンが無効です、リフレッシュを試行中...');
 
-            // リフレッシュトークンで新しいアクセストークンを取得
             const refreshResult = await apiRefreshToken(refreshToken);
-
             if (refreshResult.success && refreshResult.data) {
-              console.log('トークンリフレッシュ成功');
-              const newAccessToken = refreshResult.data.access_token;
+              console.log('トークンリフレッシュが成功しました');
 
-              // 新しいトークンを保存
-              saveTokens(newAccessToken, refreshToken);
-
-              // 新しいトークンで認証情報を確認
-              const newVerifyResult = await verifyToken(newAccessToken);
+              // リフレッシュ後は新しいトークンで再検証
+              const newVerifyResult = await verifyToken(refreshResult.data.access_token);
               if (newVerifyResult.success && newVerifyResult.data) {
-                await setAuthenticatedUser(newVerifyResult.data, newAccessToken);
+                await setAuthenticatedUser(newVerifyResult.data, refreshResult.data.access_token);
+                saveTokens(refreshResult.data.access_token, refreshToken);
+              } else {
+                console.log('リフレッシュ後の検証に失敗しました、認証をクリア');
+                await clearAuthState();
               }
             } else {
-              console.log('トークンリフレッシュ失敗、ログアウト');
+              console.log('トークンリフレッシュに失敗しました、認証をクリア');
               await clearAuthState();
             }
           } else {
-            console.log('有効なトークンなし、ログアウト状態');
+            console.log('リフレッシュトークンがありません、認証をクリア');
             await clearAuthState();
           }
         } else {
-          console.log('保存されたトークンなし');
+          console.log('保存されたトークンがありません');
         }
       } catch (error) {
         console.error('認証初期化エラー:', error);
@@ -178,59 +166,64 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     initializeAuth();
   }, []);
 
-  // 認証されたユーザー情報を設定
+  // 認証済みユーザーの設定 - 修正版（APIレスポンス構造に合わせて）
   const setAuthenticatedUser = async (authData: any, accessToken: string) => {
     try {
+      console.log('認証ユーザーの設定を開始します:', authData);
+
+      // APIレスポンスの構造に合わせて調整
+      const userInfo = authData.user || authData;
+      const tenantInfo = authData.tenant;
+
       // ユーザー情報の設定
       const userData: User = {
-        id: authData.user.id,
-        email: authData.user.email,
-        full_name: authData.user.full_name,
-        first_name: authData.user.first_name,
-        last_name: authData.user.last_name,
-        role: authData.user.role,
-        avatar_url: authData.user.avatar_url,
-        tenant_id: authData.user.tenant_id,
-        is_active: true,
-        // 追加フィールド
-        job_title: authData.user.job_title,
-        company: authData.user.company,
-        is_test_account: authData.user.is_test_account,
-        permissions: authData.user.permissions,
-        last_login_at: authData.user.last_login_at,
+        id: userInfo.id,
+        email: userInfo.email,
+        full_name: userInfo.full_name || userInfo.email,
+        first_name: userInfo.first_name,
+        last_name: userInfo.last_name,
+        role: userInfo.role || 'member',
+        avatar_url: userInfo.avatar_url,
+        tenant_id: userInfo.tenant_id || tenantInfo?.id || '',
+        is_active: userInfo.is_active !== false,
+        job_title: userInfo.job_title,
+        company: userInfo.company,
+        is_test_account: userInfo.is_test_account || false,
+        permissions: userInfo.permissions,
+        last_login_at: userInfo.last_login_at,
       };
 
-      // プロファイル情報の設定（後方互換性）
+      // プロファイル情報の設定（後方互換性のため）
       const profileData: UserProfile = {
-        id: authData.user.id,
-        email: authData.user.email,
-        first_name: authData.user.first_name,
-        last_name: authData.user.last_name,
-        full_name: authData.user.full_name,
-        avatar_url: authData.user.avatar_url,
-        job_title: authData.user.job_title,
-        company: authData.user.company,
-        role: authData.user.role,
-        tenant_id: authData.user.tenant_id,
-        is_test_account: authData.user.is_test_account || false,
-        expires_at: authData.user.expires_at,
+        id: userInfo.id,
+        email: userInfo.email,
+        first_name: userInfo.first_name,
+        last_name: userInfo.last_name,
+        full_name: userInfo.full_name || userInfo.email,
+        avatar_url: userInfo.avatar_url,
+        job_title: userInfo.job_title,
+        company: userInfo.company,
+        role: userInfo.role || 'member',
+        tenant_id: userInfo.tenant_id || tenantInfo?.id || '',
+        is_test_account: userInfo.is_test_account || false,
+        expires_at: userInfo.expires_at,
       };
 
       // テナント情報の設定
       let tenantData: Tenant | null = null;
-      if (authData.tenant) {
+      if (tenantInfo) {
         tenantData = {
-          id: authData.tenant.id,
-          name: authData.tenant.name,
-          tenant_type: authData.tenant.tenant_type,
-          domain: authData.tenant.domain,
-          is_active: authData.tenant.is_active !== false,
-          subscription_plan: authData.tenant.subscription_plan,
-          max_users: authData.tenant.max_users,
-          company_name: authData.tenant.company_name,
-          company_email: authData.tenant.company_email,
-          contact_email: authData.tenant.contact_email,
-          contact_phone: authData.tenant.contact_phone,
+          id: tenantInfo.id,
+          name: tenantInfo.name,
+          tenant_type: tenantInfo.tenant_type === 'enterprise' ? 'enterprise' : 'personal',
+          domain: tenantInfo.domain,
+          is_active: tenantInfo.is_active !== false,
+          subscription_plan: tenantInfo.subscription_plan,
+          max_users: tenantInfo.max_users,
+          company_name: tenantInfo.company_name,
+          company_email: tenantInfo.company_email,
+          contact_email: tenantInfo.contact_email,
+          contact_phone: tenantInfo.contact_phone,
         };
       }
 
@@ -240,9 +233,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setCurrentTenant(tenantData);
       setToken(accessToken);
 
-      // 業務クライアントにトークンを設定
-      await setBusinessClientToken(accessToken);
-      await initializeBusinessClient();
+      // 業務クライアントにトークンを設定 - エラーハンドリング強化
+      try {
+        const businessTokenResult = await setBusinessClientToken(accessToken);
+        if (businessTokenResult) {
+          console.log('業務クライアントのトークン設定が成功しました');
+          await initializeBusinessClient();
+        } else {
+          console.warn('業務クライアントのトークン設定に失敗しましたが、認証は継続します');
+        }
+      } catch (businessError) {
+        console.error('業務クライアント設定エラー（認証は継続）:', businessError);
+        // 業務クライアントの設定に失敗しても認証は継続
+      }
 
       console.log('ユーザー認証状態を設定完了:', userData.email);
     } catch (error) {
@@ -260,69 +263,77 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setToken(null);
     clearStoredTokens();
     clearBusinessClientAuth();
+    console.log('認証状態がクリアされました');
   };
 
-  // ログイン機能
+  // ログイン機能 - エラーハンドリング強化
   const signIn = async (email: string, password: string, tenantId?: string): Promise<{ error: Error | null }> => {
     try {
       setLoading(true);
-      console.log('ログイン試行:', email);
+      console.log('ログイン処理を開始します:', email);
 
-      const result = await authLogin({ email, password, tenant_id: tenantId });
+      // LoginCredentials型に合わせて引数を調整
+      const credentials: LoginCredentials = {
+        email,
+        password,
+        tenant_id: tenantId
+      };
 
-      if (result.success && result.data) {
-        console.log('ログイン成功');
+      const result = await authLogin(credentials);
 
-        // トークンの保存
-        saveTokens(result.data.access_token, result.data.refresh_token);
-
-        // 認証状態の設定
-        await setAuthenticatedUser(result.data, result.data.access_token);
+      if (!result.success || !result.data) {
+        const error = new Error(result.message || 'ログインに失敗しました');
+        console.error('ログインエラー:', error.message);
 
         toast({
-          title: "ログイン成功",
-          description: `お帰りなさい、${result.data.user.full_name || result.data.user.email}さん！`,
-        });
-
-        return { error: null };
-      } else {
-        console.error('ログイン失敗:', result.message);
-        toast({
-          title: "ログイン失敗",
-          description: result.message,
+          title: "ログインエラー",
+          description: error.message,
           variant: "destructive",
         });
-        return { error: new Error(result.message) };
+
+        return { error };
       }
-    } catch (error) {
-      console.error('ログインエラー:', error);
+
+      // トークンの保存
+      saveTokens(result.data.access_token, result.data.refresh_token);
+
+      // 認証済みユーザーの設定
+      await setAuthenticatedUser(result.data, result.data.access_token);
+
+      console.log('ログインが完了しました');
+
+      toast({
+        title: "ログイン成功",
+        description: `お帰りなさい、${result.data.user.full_name || result.data.user.email}さん！`,
+      });
+
+      return { error: null };
+    } catch (error: any) {
+      console.error('ログイン処理中のエラー:', error);
+      await clearAuthState();
+
+      const errorMessage = error.message || 'ログインに失敗しました';
       toast({
         title: "ログインエラー",
-        description: "予期しないエラーが発生しました",
+        description: errorMessage,
         variant: "destructive",
       });
-      return { error: error as Error };
+
+      return { error: new Error(errorMessage) };
     } finally {
       setLoading(false);
     }
   };
 
-  // サインアップ機能（将来の拡張のため）
+  // サインアップ機能
   const signUp = async (email: string, password: string, userData?: any): Promise<{ error: Error | null }> => {
     try {
       setLoading(true);
-      console.log('サインアップ機能は現在実装されていません');
-
-      toast({
-        title: "未実装",
-        description: "サインアップ機能は現在利用できません",
-        variant: "destructive",
-      });
-
-      return { error: new Error('サインアップ機能は現在実装されていません') };
-    } catch (error) {
-      console.error('サインアップエラー:', error);
-      return { error: error as Error };
+      // ここにサインアップのロジックを実装
+      // 現在は未実装のためエラーを返す
+      return { error: new Error('サインアップ機能は未実装です') };
+    } catch (error: any) {
+      return { error: new Error(error.message || 'サインアップに失敗しました') };
     } finally {
       setLoading(false);
     }
@@ -332,7 +343,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     try {
       setLoading(true);
-      console.log('ログアウト処理中...');
 
       // サーバーサイドでのログアウト処理
       const { refreshToken } = getStoredTokens();
@@ -340,114 +350,86 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
           await authLogout(refreshToken);
         } catch (error) {
-          console.error('サーバーサイドログアウトエラー:', error);
-          // エラーがあってもクライアントサイドのクリアは実行
+          console.warn('サーバーサイドログアウトに失敗しましたが、ローカル状態はクリアします:', error);
         }
       }
 
-      // クライアントサイドの状態クリア
+      // ローカル状態のクリア
       await clearAuthState();
 
       toast({
         title: "ログアウト完了",
-        description: "またのご利用をお待ちしております",
+        description: "正常にログアウトしました",
       });
-
-      console.log('ログアウト完了');
     } catch (error) {
       console.error('ログアウトエラー:', error);
-      // エラーがあってもクライアントサイドのクリアは実行
-      await clearAuthState();
     } finally {
       setLoading(false);
     }
   };
 
-  // Google ログイン（将来の拡張のため）
+  // Google認証（未実装）
   const signInWithGoogle = async () => {
-    console.log('Google ログイン機能は現在実装されていません');
-    toast({
-      title: "未実装",
-      description: "Google ログイン機能は現在利用できません",
-      variant: "destructive",
-    });
+    console.log('Google認証は未実装です');
   };
 
-  // テナント切り替え（将来の拡張のため）
+  // テナント切り替え（未実装）
   const switchTenant = async (tenantId: string) => {
-    console.log('テナント切り替え機能は現在実装されていません');
-    toast({
-      title: "未実装",
-      description: "テナント切り替え機能は現在利用できません",
-      variant: "destructive",
-    });
+    console.log('テナント切り替えは未実装です:', tenantId);
   };
 
-  // テナント作成（将来の拡張のため）
+  // テナント作成（未実装）
   const createTenant = async (name: string, type: 'personal' | 'enterprise', domain?: string): Promise<{ error: Error | null }> => {
-    console.log('テナント作成機能は現在実装されていません');
-    return { error: new Error('テナント作成機能は現在実装されていません') };
+    return { error: new Error('テナント作成機能は未実装です') };
   };
 
-  // ユーザー招待（将来の拡張のため）
+  // ユーザー招待（未実装）
   const inviteUser = async (email: string, role: string, tenantId: string): Promise<{ error: Error | null }> => {
-    console.log('ユーザー招待機能は現在実装されていません');
-    return { error: new Error('ユーザー招待機能は現在実装されていません') };
+    return { error: new Error('ユーザー招待機能は未実装です') };
   };
 
   // トークンリフレッシュ
-  const refreshToken = async (): Promise<{ success: boolean; error?: string }> => {
+  const refreshTokenFunction = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { refreshToken: storedRefreshToken } = getStoredTokens();
-
-      if (!storedRefreshToken) {
+      const { refreshToken } = getStoredTokens();
+      if (!refreshToken) {
         return { success: false, error: 'リフレッシュトークンがありません' };
       }
 
-      const result = await apiRefreshToken(storedRefreshToken);
-
+      const result = await apiRefreshToken(refreshToken);
       if (result.success && result.data) {
-        // 新しいトークンを保存
-        saveTokens(result.data.access_token, storedRefreshToken);
+        saveTokens(result.data.access_token, refreshToken);
+        await setBusinessClientToken(result.data.access_token);
         setToken(result.data.access_token);
-
-        // 業務クライアントのトークンも更新
-        await setBusinessClientToken(result.data.access_token, storedRefreshToken);
-
         return { success: true };
-      } else {
-        return { success: false, error: result.message || 'トークンリフレッシュに失敗しました' };
       }
-    } catch (error) {
-      console.error('トークンリフレッシュエラー:', error);
-      return { success: false, error: 'トークンリフレッシュ中にエラーが発生しました' };
+
+      return { success: false, error: result.message || 'トークンリフレッシュに失敗しました' };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   };
 
-  // 現在のトークンの検証
+  // 現在のトークン検証
   const verifyCurrentToken = async (): Promise<{ valid: boolean; error?: string }> => {
     try {
-      if (!token) {
+      const { accessToken } = getStoredTokens();
+      if (!accessToken) {
         return { valid: false, error: 'トークンがありません' };
       }
 
-      const result = await verifyToken(token);
-
-      if (result.success) {
-        return { valid: true };
-      } else {
-        return { valid: false, error: result.message || 'トークンが無効です' };
-      }
-    } catch (error) {
-      console.error('トークン検証エラー:', error);
-      return { valid: false, error: 'トークン検証中にエラーが発生しました' };
+      const result = await verifyToken(accessToken);
+      return { valid: result.success, error: result.message };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
     }
   };
 
-  // session は後方互換性のため user と同じ値を返す
+  // セッション情報（後方互換性のため）
   const session = user ? { user } : null;
 
-  const value: AuthContextType = {
+  // コンテキスト値
+  const contextValue: AuthContextType = {
     user,
     profile,
     session,
@@ -462,9 +444,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     switchTenant,
     createTenant,
     inviteUser,
-    refreshToken,
+    refreshToken: refreshTokenFunction,
     verifyCurrentToken,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// カスタムフック
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth は AuthProvider 内で使用する必要があります');
+  }
+  return context;
 };
