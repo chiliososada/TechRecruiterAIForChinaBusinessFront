@@ -5,51 +5,57 @@ import type { Database } from './types';
 // 環境変数から設定を取得
 const getEnvVar = (key: string, fallback?: string): string => {
   if (typeof window !== 'undefined') {
-    // ブラウザ環境では process.env は利用できないことがある
-    return (process.env as any)[key] || fallback || '';
+    // ブラウザ環境では import.meta.env を使用（Vite）
+    return (import.meta.env[key] || fallback || '');
   }
   return process.env[key] || fallback || '';
 };
 
 // 認証システム用Supabase設定 (identity-hub-control) - 環境変数必須
-const AUTH_SUPABASE_URL = getEnvVar('NEXT_PUBLIC_AUTH_SUPABASE_URL');
-const AUTH_SUPABASE_ANON_KEY = getEnvVar('NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY');
+const AUTH_SUPABASE_URL = getEnvVar('VITE_AUTH_SUPABASE_URL');
+const AUTH_SUPABASE_ANON_KEY = getEnvVar('VITE_AUTH_SUPABASE_ANON_KEY');
 
 // 業務データベース用Supabase設定 (新しいデータベース) - 環境変数必須
-const BUSINESS_SUPABASE_URL = getEnvVar('NEXT_PUBLIC_BUSINESS_SUPABASE_URL');
-const BUSINESS_SUPABASE_ANON_KEY = getEnvVar('NEXT_PUBLIC_BUSINESS_SUPABASE_ANON_KEY');
+const BUSINESS_SUPABASE_URL = getEnvVar('VITE_BUSINESS_SUPABASE_URL');
+const BUSINESS_SUPABASE_ANON_KEY = getEnvVar('VITE_BUSINESS_SUPABASE_ANON_KEY');
 
 // 必須設定のチェック
 if (!AUTH_SUPABASE_URL || !AUTH_SUPABASE_ANON_KEY) {
-  throw new Error('認証システム用Supabase設定が不完全です。NEXT_PUBLIC_AUTH_SUPABASE_URL と NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY を環境変数に設定してください。');
+  console.error('認証システム用Supabase設定が不完全です。VITE_AUTH_SUPABASE_URL と VITE_AUTH_SUPABASE_ANON_KEY を環境変数に設定してください。');
 }
 
 if (!BUSINESS_SUPABASE_URL || !BUSINESS_SUPABASE_ANON_KEY) {
-  throw new Error('業務データベース用Supabase設定が不完全です。NEXT_PUBLIC_BUSINESS_SUPABASE_URL と NEXT_PUBLIC_BUSINESS_SUPABASE_ANON_KEY を環境変数に設定してください。');
+  console.error('業務データベース用Supabase設定が不完全です。VITE_BUSINESS_SUPABASE_URL と VITE_BUSINESS_SUPABASE_ANON_KEY を環境変数に設定してください。');
 }
 
 // 開発環境での設定チェック
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   console.log('Supabase設定確認:');
   console.log('認証DB URL:', AUTH_SUPABASE_URL);
   console.log('認証DB キー:', AUTH_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
   console.log('業務DB URL:', BUSINESS_SUPABASE_URL);
-  console.log('業務DB キー:', BUSINESS_SUPABASE_ANON_KEY !== 'YOUR_BUSINESS_ANON_KEY_PLACEHOLDER' ? 'セット済み' : '未設定');
+  console.log('業務DB キー:', BUSINESS_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
 }
 
 // 認証専用クライアント（identity-hub-control用）
-export const authClient = createClient(
+export const authClient = AUTH_SUPABASE_URL && AUTH_SUPABASE_ANON_KEY ? createClient(
   AUTH_SUPABASE_URL,
   AUTH_SUPABASE_ANON_KEY,
   {
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      flowType: 'pkce'
+    },
+    global: {
+      headers: {
+        'x-tenant-id': typeof window !== 'undefined' ? localStorage.getItem('currentTenantId') || '' : ''
+      }
     }
   }
-);
+) : null;
 
 // 業務データ専用クライアント - JWT認証対応
 class BusinessSupabaseClient {
@@ -164,27 +170,81 @@ class BusinessSupabaseClient {
   }
 }
 
-// 業務クライアントのシングルトンインスタンス
-export const businessClient = new BusinessSupabaseClient();
+// 業務クライアントのシングルトンインスタンス（businessClientとしてエクスポート）
+export const businessClient = BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY ? new BusinessSupabaseClient() : null;
 
-// 便利関数
+// 便利関数 - setBusinessClientAuth を追加
 export const setBusinessClientAuth = (token: string | null) => {
-  businessClient.setAuth(token);
+  if (businessClient) {
+    businessClient.setAuth(token);
+  }
 };
 
 export const isBusinessClientAuthenticated = (): boolean => {
-  return businessClient.isAuthenticated();
+  return businessClient ? businessClient.isAuthenticated() : false;
 };
 
-// 後方互換性のため - 既存のコードが supabase を使用している場合
-export const supabase = businessClient;
+// 認証用APIエンドポイント
+export const AUTH_API_URL = getEnvVar('VITE_API_BASE_URL', 'https://fuetincqvlvcptnzpood.supabase.co/functions/v1');
+
+// エクスポート - 既存のコードとの互換性のため
+export const supabase = authClient; // 互換性のため
+
+// ユーティリティ関数
+export const getCurrentUser = async () => {
+  if (!authClient) return null;
+  const { data: { user } } = await authClient.auth.getUser();
+  return user;
+};
+
+export const signOut = async () => {
+  if (!authClient) return;
+  await authClient.auth.signOut();
+  localStorage.removeItem('currentTenantId');
+};
+
+// テナントIDを設定する関数
+export const setCurrentTenant = (tenantId: string) => {
+  localStorage.setItem('currentTenantId', tenantId);
+
+  // 新しいクライアントを作成して更新（ヘッダーは作成時のみ設定可能）
+  if (AUTH_SUPABASE_URL && AUTH_SUPABASE_ANON_KEY) {
+    (window as any).authClient = createClient(
+      AUTH_SUPABASE_URL,
+      AUTH_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+          flowType: 'pkce'
+        },
+        global: {
+          headers: {
+            'x-tenant-id': tenantId
+          }
+        }
+      }
+    );
+  }
+
+  if (BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY && businessClient) {
+    // ビジネスクライアントも新しいテナントIDで再作成が必要な場合
+    // 現在のトークンを保持
+    const currentToken = businessClient.hasValidToken() ? 'current_token' : null;
+    if (currentToken) {
+      businessClient.setAuth(currentToken);
+    }
+  }
+};
 
 // 認証状態の取得
 export const getAuthStatus = () => {
   return {
-    hasAuthToken: businessClient.hasValidToken(),
-    isAuthenticated: businessClient.isAuthenticated(),
+    hasAuthToken: businessClient ? businessClient.hasValidToken() : false,
+    isAuthenticated: businessClient ? businessClient.isAuthenticated() : false,
     authClientReady: !!AUTH_SUPABASE_URL && !!AUTH_SUPABASE_ANON_KEY,
-    businessClientReady: !!BUSINESS_SUPABASE_URL && BUSINESS_SUPABASE_ANON_KEY !== 'YOUR_BUSINESS_ANON_KEY_PLACEHOLDER'
+    businessClientReady: !!BUSINESS_SUPABASE_URL && !!BUSINESS_SUPABASE_ANON_KEY
   };
 };
