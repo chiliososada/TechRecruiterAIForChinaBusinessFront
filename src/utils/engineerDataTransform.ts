@@ -53,6 +53,8 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
 
 // 将UI engineer转换为数据库格式
 export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
+  console.log('=== transformUIToDatabaseEngineer Input ===', uiEngineer);
+  
   // 处理状态值 - 确保使用正确的数据库状态值
   let dbStatus = '提案中'; // 默认状态
   if (uiEngineer.status) {
@@ -63,7 +65,7 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     }
   }
   
-  return {
+  const transformedData = {
     name: uiEngineer.name,
     skills: ensureArray(uiEngineer.skills),
     japanese_level: emptyStringToNull(uiEngineer.japaneseLevel),
@@ -73,7 +75,7 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     current_status: dbStatus,
     remarks: emptyStringToNull(uiEngineer.remarks),
     company_name: emptyStringToNull(uiEngineer.companyName),
-    technical_keywords: ensureArray(uiEngineer.technicalKeywords),
+    technical_keywords: [], // 已删除此字段，设为空数组
     self_promotion: emptyStringToNull(uiEngineer.selfPromotion),
     work_scope: emptyStringToNull(uiEngineer.workScope),
     work_experience: emptyStringToNull(uiEngineer.workExperience),
@@ -87,4 +89,7 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     email: emptyStringToNull(uiEngineer.email),
     phone: emptyStringToNull(uiEngineer.phone)
   };
+  
+  console.log('=== transformUIToDatabaseEngineer Output ===', transformedData);
+  return transformedData;
 };

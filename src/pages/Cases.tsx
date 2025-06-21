@@ -97,12 +97,17 @@ export function Cases({ companyType = 'own' }: CasesProps) {
     console.log('Total projects from DB:', projects.length);
     console.log('Target company type:', targetCompanyType);
     console.log('Effective company type:', effectiveCompanyType);
-    console.log('Projects data (first 3):', projects.slice(0, 3).map(p => ({ 
+    console.log('ALL Projects data with company_type:', projects.map(p => ({ 
       id: p.id, 
       title: p.title, 
-      updated_at: p.updated_at,
-      company_type: p.company_type 
+      company_type: p.company_type,
+      is_active: p.is_active
     })));
+    
+    // 检查是否有null、undefined或其他意外值
+    const companyTypes = projects.map(p => p.company_type);
+    console.log('All company_type values:', companyTypes);
+    console.log('Unique company_type values:', [...new Set(companyTypes)]);
     
     // Filter by company_type and ensure is_active = true
     const filteredByCompanyType = projects.filter(project => {
@@ -110,8 +115,19 @@ export function Cases({ companyType = 'own' }: CasesProps) {
       const isActive = project.is_active === true; // Explicitly check for active projects
       const matches = matchesCompanyType && isActive;
       
+      console.log(`Project "${project.title}":`, {
+        company_type: project.company_type,
+        expected: targetCompanyType,
+        matchesCompanyType,
+        is_active: project.is_active,
+        isActive,
+        finalMatch: matches
+      });
+      
       if (!matches) {
-        console.log(`Filtered out project "${project.title}" - company_type: "${project.company_type}" (expected: "${targetCompanyType}"), is_active: ${project.is_active}`);
+        console.log(`❌ Filtered out project "${project.title}" - company_type: "${project.company_type}" (expected: "${targetCompanyType}"), is_active: ${project.is_active}`);
+      } else {
+        console.log(`✅ Included project "${project.title}"`);
       }
       return matches;
     });

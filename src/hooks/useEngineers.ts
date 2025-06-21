@@ -147,45 +147,12 @@ export const useEngineers = (companyType: 'own' | 'other') => {
     try {
       console.log('Creating engineer with data:', engineerData);
 
-      // 数据库状态值映射 - 确保只使用数据库允许的日文状态值
-      let dbStatus = '提案中'; // 默认状态使用数据库允许的日文值
 
-      if (engineerData.status) {
-        // 数据库允许的状态值
-        const validStatuses = ['提案中', '事前面談', '面談', '結果待ち', '契約中', '営業終了', 'アーカイブ'];
-        if (validStatuses.includes(engineerData.status)) {
-          dbStatus = engineerData.status;
-        } else {
-          // 如果是其他值，都设为默认的 提案中
-          dbStatus = '提案中';
-        }
-      }
-
+      // 使用已经转换好的数据，只添加必要的系统字段
       const newEngineer = {
-        name: engineerData.name,
-        skills: ensureArray(engineerData.skills),
-        japanese_level: engineerData.japaneseLevel || null,
-        english_level: engineerData.englishLevel || null,
-        experience: engineerData.experience,
-        availability: engineerData.availability || null,
-        current_status: dbStatus, // 使用映射后的日文状态
-        remarks: engineerData.remarks || null,
+        ...engineerData, // 使用已经转换的数据
         company_type: companyTypeMapping[companyType],
-        company_name: engineerData.companyName || null,
         source: 'manual',
-        technical_keywords: ensureArray(engineerData.technicalKeywords),
-        self_promotion: engineerData.selfPromotion || null,
-        work_scope: engineerData.workScope || null,
-        work_experience: engineerData.workExperience || null,
-        nationality: engineerData.nationality || null,
-        age: engineerData.age || null,
-        gender: engineerData.gender || null,
-        nearest_station: engineerData.nearestStation || null,
-        education: engineerData.education || null,
-        arrival_year_japan: engineerData.arrivalYear || null,
-        certifications: ensureArray(engineerData.certifications),
-        email: engineerData.email || null,
-        phone: engineerData.phone || null,
         tenant_id: currentTenant.id,
         is_active: true,
         created_at: new Date().toISOString(),

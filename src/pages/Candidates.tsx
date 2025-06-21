@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsWithContext } from '@/components/ui/tabs';
 import { CandidateList } from '@/components/candidates/CandidateList';
-import { CandidateForm } from '@/components/candidates/CandidateForm';
-import { ResumeUpload } from '@/components/candidates/ResumeUpload';
+import { CandidateFormStyled as CandidateForm } from '@/components/candidates/CandidateFormStyled';
+import { ResumeUploadStyled as ResumeUpload } from '@/components/candidates/ResumeUploadStyled';
 import { useLocation } from 'react-router-dom';
 import { Engineer, NewEngineerType } from '@/components/candidates/types';
 import { toast } from 'sonner';
@@ -161,7 +161,9 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   // Handle creating new engineer
   const handleCreateEngineer = async (formData: NewEngineerType) => {
+    console.log('=== Candidates.tsx handleCreateEngineer formData ===', formData);
     const transformedData = transformUIToDatabaseEngineer(formData);
+    console.log('=== Candidates.tsx handleCreateEngineer transformedData ===', transformedData);
     const result = await createEngineer(transformedData);
     return result !== null;
   };
@@ -260,7 +262,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
           </TabsContent>
           
           <TabsContent value="resume" contextId={tabContextId}>
-            <ResumeUpload />
+            <ResumeUpload onCreateEngineer={handleCreateEngineer} />
           </TabsContent>
         </TabsWithContext>
 

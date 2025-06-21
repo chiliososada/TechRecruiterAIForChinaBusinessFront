@@ -98,13 +98,31 @@ export const authLogin = async (credentials: LoginCredentials): Promise<AuthResp
             };
         }
 
+        // レスポンスデータの詳細ログ
+        console.log('認証API生レスポンス:', {
+            hasAccessToken: !!data.access_token,
+            hasRefreshToken: !!data.refresh_token,
+            accessTokenLength: data.access_token ? data.access_token.length : 0,
+            refreshTokenLength: data.refresh_token ? data.refresh_token.length : 0,
+            responseKeys: Object.keys(data)
+        });
+
+        // 必須トークンのチェック
+        if (!data.access_token) {
+            console.error('アクセストークンがレスポンスに含まれていません');
+            return {
+                success: false,
+                message: 'アクセストークンを取得できませんでした'
+            };
+        }
+
         // 成功レスポンスの構造を調整
         return {
             success: true,
             message: 'ログイン成功',
             data: {
                 access_token: data.access_token,
-                refresh_token: data.refresh_token || '', // リフレッシュトークンがない場合は空文字
+                refresh_token: data.refresh_token || data.access_token, // リフレッシュトークンがない場合はアクセストークンを使用
                 user: {
                     id: data.user.id,
                     email: data.user.email,
@@ -128,9 +146,11 @@ export const authLogin = async (credentials: LoginCredentials): Promise<AuthResp
     }
 };
 
-// トークン検証 API呼び出し
+// トークン検証 API呼び出し - 改善版
 export const verifyToken = async (token: string): Promise<AuthResponse> => {
     try {
+        console.log('トークン検証を開始します...');
+        
         const response = await fetch(`${AUTH_API_BASE}/auth-verify`, {
             method: 'POST',
             headers: {
@@ -140,25 +160,60 @@ export const verifyToken = async (token: string): Promise<AuthResponse> => {
             },
         });
 
-        const data = await response.json();
+        console.log('トークン検証API応答:', response.status, response.statusText);
 
-        if (!response.ok) {
-            throw new Error(data.message || 'トークン検証に失敗しました');
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            console.error('トークン検証レスポンスのJSON解析エラー:', jsonError);
+            return {
+                success: false,
+                message: 'サーバーからの応答が無効です'
+            };
         }
 
-        return data;
+        if (!response.ok) {
+            console.warn('トークン検証が失敗しました:', data.message || response.statusText);
+            return {
+                success: false,
+                message: data.message || `HTTP Error: ${response.status}`
+            };
+        }
+
+        console.log('トークン検証が成功しました');
+        return {
+            success: true,
+            message: 'トークン検証成功',
+            data: data.data || data  // レスポンス構造に対応
+        };
+
     } catch (error) {
-        console.error('トークン検証エラー:', error);
+        console.error('トークン検証でネットワークエラー:', error);
+        
+        // より詳細なエラー情報を提供
+        let errorMessage = 'ネットワークエラーが発生しました';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        
+        // 503エラーの場合は特別に処理
+        if (errorMessage.includes('503') || errorMessage.includes('Service Unavailable')) {
+            errorMessage = '503 Service Unavailable - API サーバーが一時的に利用できません';
+        }
+        
         return {
             success: false,
-            message: error instanceof Error ? error.message : 'トークン検証に失敗しました'
+            message: errorMessage
         };
     }
 };
 
-// トークンリフレッシュ API呼び出し
+// トークンリフレッシュ API呼び出し - 改善版
 export const refreshToken = async (refreshToken: string): Promise<RefreshTokenResponse> => {
     try {
+        console.log('トークンリフレッシュを開始します...');
+        
         const response = await fetch(`${AUTH_API_BASE}/auth-refresh`, {
             method: 'POST',
             headers: {
@@ -169,18 +224,39 @@ export const refreshToken = async (refreshToken: string): Promise<RefreshTokenRe
             body: JSON.stringify({ refresh_token: refreshToken }),
         });
 
-        const data = await response.json();
+        console.log('トークンリフレッシュAPI応答:', response.status, response.statusText);
 
-        if (!response.ok) {
-            throw new Error(data.message || 'トークンリフレッシュに失敗しました');
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            console.error('リフレッシュレスポンスのJSON解析エラー:', jsonError);
+            return {
+                success: false,
+                message: 'サーバーからの応答が無効です'
+            };
         }
 
-        return data;
+        if (!response.ok) {
+            console.warn('トークンリフレッシュが失敗しました:', data.message || response.statusText);
+            return {
+                success: false,
+                message: data.message || `HTTP Error: ${response.status}`
+            };
+        }
+
+        console.log('トークンリフレッシュが成功しました');
+        return {
+            success: true,
+            data: data.data || data,  // レスポンス構造に対応
+            message: 'リフレッシュ成功'
+        };
+
     } catch (error) {
-        console.error('トークンリフレッシュエラー:', error);
+        console.error('トークンリフレッシュでネットワークエラー:', error);
         return {
             success: false,
-            message: error instanceof Error ? error.message : 'トークンリフレッシュに失敗しました'
+            message: error instanceof Error ? error.message : 'ネットワークエラーが発生しました'
         };
     }
 };
@@ -212,22 +288,124 @@ export const authLogout = async (token: string): Promise<{ success: boolean; mes
     }
 };
 
+// 安全なストレージアクセス用のヘルパー関数
+const isStorageAvailable = (): boolean => {
+    try {
+        return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+    } catch {
+        return false;
+    }
+};
+
 // トークンをローカルストレージに保存
 export const saveTokens = (accessToken: string, refreshToken: string) => {
-    localStorage.setItem('auth_access_token', accessToken);
-    localStorage.setItem('auth_refresh_token', refreshToken);
+    console.log('saveTokens関数が呼び出されました:', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        accessTokenLength: accessToken ? accessToken.length : 0,
+        refreshTokenLength: refreshToken ? refreshToken.length : 0
+    });
+
+    if (!isStorageAvailable()) {
+        console.warn('localStorage is not available');
+        return;
+    }
+    
+    if (!accessToken) {
+        console.error('アクセストークンが無効です:', {
+            accessToken: accessToken ? 'あり' : 'なし',
+            refreshToken: refreshToken ? 'あり' : 'なし'
+        });
+        return;
+    }
+    
+    // リフレッシュトークンがない場合はアクセストークンを使用
+    const actualRefreshToken = refreshToken || accessToken;
+    console.log('トークン調整:', {
+        usesSameToken: !refreshToken,
+        refreshTokenSource: refreshToken ? 'provided' : 'copied from access'
+    });
+    
+    try {
+        console.log('localStorage保存を実行中...');
+        localStorage.setItem('auth_access_token', accessToken);
+        localStorage.setItem('auth_refresh_token', actualRefreshToken);
+        // 保存時刻も記録（デバッグ用）
+        localStorage.setItem('auth_token_saved_at', new Date().toISOString());
+        
+        // 保存後の確認
+        const verifyAccess = localStorage.getItem('auth_access_token');
+        const verifyRefresh = localStorage.getItem('auth_refresh_token');
+        console.log('保存後の確認:', {
+            accessTokenSaved: verifyAccess === accessToken,
+            refreshTokenSaved: verifyRefresh === actualRefreshToken,
+            actualAccessLength: verifyAccess ? verifyAccess.length : 0,
+            actualRefreshLength: verifyRefresh ? verifyRefresh.length : 0,
+            usedSameToken: actualRefreshToken === accessToken
+        });
+        
+        console.log('トークンが正常に保存されました');
+    } catch (error) {
+        console.error('トークン保存エラー:', error);
+    }
 };
 
 // トークンをローカルストレージから取得
 export const getStoredTokens = () => {
-    return {
-        accessToken: localStorage.getItem('auth_access_token'),
-        refreshToken: localStorage.getItem('auth_refresh_token')
-    };
+    if (!isStorageAvailable()) {
+        console.warn('localStorage is not available');
+        return {
+            accessToken: null,
+            refreshToken: null
+        };
+    }
+    
+    try {
+        const accessToken = localStorage.getItem('auth_access_token');
+        const refreshToken = localStorage.getItem('auth_refresh_token');
+        const savedAt = localStorage.getItem('auth_token_saved_at');
+        
+        console.log('localStorage状態チェック:', {
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken,
+            accessTokenLength: accessToken ? accessToken.length : 0,
+            refreshTokenLength: refreshToken ? refreshToken.length : 0,
+            savedAt: savedAt,
+            storageKeys: Object.keys(localStorage).filter(key => key.startsWith('auth_'))
+        });
+        
+        if (accessToken && refreshToken) {
+            console.log('有効なトークンペアを取得しました');
+        } else {
+            console.log('トークンが見つかりません または 不完全です');
+        }
+        
+        return {
+            accessToken,
+            refreshToken
+        };
+    } catch (error) {
+        console.error('トークン取得エラー:', error);
+        return {
+            accessToken: null,
+            refreshToken: null
+        };
+    }
 };
 
 // トークンをローカルストレージからクリア
 export const clearStoredTokens = () => {
-    localStorage.removeItem('auth_access_token');
-    localStorage.removeItem('auth_refresh_token');
+    if (!isStorageAvailable()) {
+        console.warn('localStorage is not available');
+        return;
+    }
+    
+    try {
+        localStorage.removeItem('auth_access_token');
+        localStorage.removeItem('auth_refresh_token');
+        localStorage.removeItem('auth_token_saved_at');
+        console.log('保存されたトークンをクリアしました');
+    } catch (error) {
+        console.error('トークンクリアエラー:', error);
+    }
 };

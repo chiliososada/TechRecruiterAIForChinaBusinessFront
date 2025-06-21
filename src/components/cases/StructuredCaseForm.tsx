@@ -7,16 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Briefcase, 
-  Calendar, 
-  MapPin, 
-  CircleDollarSign, 
-  Flag, 
-  Users, 
-  User, 
-  Code, 
-  FileText, 
+import {
+  Briefcase,
+  Calendar,
+  MapPin,
+  CircleDollarSign,
+  Flag,
+  Users,
+  User,
+  Code,
+  FileText,
   Clock,
   Languages,
   MessageSquare,
@@ -26,15 +26,19 @@ import { getDefaultProcesses } from './utils/statusUtils';
 import { useProjects, Project } from '@/hooks/useProjects';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { businessClientManager } from '@/integrations/supabase/business-client';
 
 export function StructuredCaseForm() {
   const { createProject, loading } = useProjects();
-  const { currentTenant } = useAuth();
+  const { currentTenant, user } = useAuth();
   const location = useLocation();
 
   // Determine company type from route
   const getCompanyType = () => {
-    return location.pathname.includes('/company/other') ? '他社' : '自社';
+    const companyType = location.pathname.includes('/company/other') ? '他社' : '自社';
+    console.log('Current route path:', location.pathname);
+    console.log('Determined company type:', companyType);
+    return companyType;
   };
 
   const [caseData, setCaseData] = useState({
@@ -62,14 +66,21 @@ export function StructuredCaseForm() {
     detail_description: ''
   });
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: unknown) => {
     setCaseData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    console.log('=== 案件保存開始 ===');
+    console.log('currentTenant:', currentTenant);
+    console.log('auth user:', user);
+    console.log('ビジネスクライアント認証状態:', businessClientManager.isAuthenticated());
+    console.log('ビジネスクライアントデバッグ情報:', businessClientManager.getDebugInfo());
+
     if (!currentTenant?.id) {
+      console.error('テナント情報が不足:', currentTenant);
       toast({
         title: "エラー",
         description: "テナント情報が不足しています",
@@ -79,6 +90,7 @@ export function StructuredCaseForm() {
     }
 
     if (!caseData.title.trim()) {
+      console.error('案件タイトルが空です');
       toast({
         title: "エラー",
         description: "案件タイトルは必須です",
@@ -87,7 +99,7 @@ export function StructuredCaseForm() {
       return;
     }
 
-    const projectData: Omit<Project, 'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'created_by'> = {
+    const projectData = {
       title: caseData.title,
       client_company: caseData.client_company || undefined,
       partner_company: caseData.partner_company || undefined,
@@ -110,36 +122,58 @@ export function StructuredCaseForm() {
       processes: caseData.processes,
       description: caseData.description || undefined,
       detail_description: caseData.detail_description || undefined,
-      company_type: getCompanyType() // Now this should work with the updated type
+      company_type: getCompanyType(),
+      tenant_id: currentTenant.id, // 必須のtenant_idを追加
+      is_active: true, // 確保設置為活躍狀態
+      source: 'manual_entry', // 手動輸入
+      registered_at: new Date().toISOString()
     };
 
-    const result = await createProject(projectData);
-    
-    if (result) {
-      // Reset form after successful creation
-      setCaseData({
-        title: '',
-        client_company: '',
-        partner_company: '',
-        manager_name: '',
-        manager_email: '',
-        skills: [],
-        experience: '不問',
-        location: '',
-        work_type: '',
-        duration: '',
-        budget: '',
-        desired_budget: '',
-        japanese_level: '不問',
-        priority: '中',
-        status: '募集中',
-        start_date: '',
-        foreigner_accepted: false,
-        freelancer_accepted: false,
-        interview_count: '1',
-        processes: [],
-        description: '',
-        detail_description: ''
+    console.log('プロジェクトデータ:', projectData);
+    console.log('createProject関数を呼び出します...');
+
+    try {
+      const result = await createProject(projectData);
+      console.log('createProject結果:', result);
+
+      if (result) {
+        toast({
+          title: "成功",
+          description: "案件を保存しました",
+        });
+
+        // 重置表单
+        setCaseData({
+          title: '',
+          client_company: '',
+          partner_company: '',
+          manager_name: '',
+          manager_email: '',
+          skills: [],
+          experience: '不問',
+          location: '',
+          work_type: '',
+          duration: '',
+          budget: '',
+          desired_budget: '',
+          japanese_level: '不問',
+          priority: '中',
+          status: '募集中',
+          start_date: '',
+          foreigner_accepted: false,
+          freelancer_accepted: false,
+          interview_count: '1',
+          processes: [],
+          description: '',
+          detail_description: ''
+        });
+      }
+    } catch (error) {
+      console.error('案件保存エラー:', error);
+      toast({
+        title: "エラー",
+        description: "案件の保存に失敗しました",
+        variant: "destructive",
       });
     }
   };
@@ -148,11 +182,11 @@ export function StructuredCaseForm() {
   const toggleProcess = (process: string) => {
     const currentProcesses = caseData.processes || [];
     const isSelected = currentProcesses.includes(process);
-    
-    const newProcesses = isSelected 
+
+    const newProcesses = isSelected
       ? currentProcesses.filter(p => p !== process)
       : [...currentProcesses, process];
-    
+
     handleChange('processes', newProcesses);
   };
 
@@ -167,10 +201,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="title" className="text-sm font-medium mb-1 japanese-text">案件タイトル *</Label>
-            <Input 
-              id="title" 
-              value={caseData.title} 
-              onChange={(e) => handleChange('title', e.target.value)} 
+            <Input
+              id="title"
+              value={caseData.title}
+              onChange={(e) => handleChange('title', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               required
             />
@@ -183,10 +217,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="client_company" className="text-sm font-medium mb-1 japanese-text">クライアント会社名</Label>
-            <Input 
-              id="client_company" 
-              value={caseData.client_company} 
-              onChange={(e) => handleChange('client_company', e.target.value)} 
+            <Input
+              id="client_company"
+              value={caseData.client_company}
+              onChange={(e) => handleChange('client_company', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
             />
           </div>
@@ -198,10 +232,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="manager_name" className="text-sm font-medium mb-1 japanese-text">担当者名</Label>
-            <Input 
-              id="manager_name" 
-              value={caseData.manager_name} 
-              onChange={(e) => handleChange('manager_name', e.target.value)} 
+            <Input
+              id="manager_name"
+              value={caseData.manager_name}
+              onChange={(e) => handleChange('manager_name', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
             />
           </div>
@@ -213,11 +247,11 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="manager_email" className="text-sm font-medium mb-1 japanese-text">担当者メール</Label>
-            <Input 
-              id="manager_email" 
+            <Input
+              id="manager_email"
               type="email"
-              value={caseData.manager_email} 
-              onChange={(e) => handleChange('manager_email', e.target.value)} 
+              value={caseData.manager_email}
+              onChange={(e) => handleChange('manager_email', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
             />
           </div>
@@ -250,10 +284,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="work_type" className="text-sm font-medium mb-1 japanese-text">勤務形態</Label>
-            <Input 
-              id="work_type" 
-              value={caseData.work_type} 
-              onChange={(e) => handleChange('work_type', e.target.value)} 
+            <Input
+              id="work_type"
+              value={caseData.work_type}
+              onChange={(e) => handleChange('work_type', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               placeholder="例：リモート可（週3出社）"
             />
@@ -266,10 +300,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="duration" className="text-sm font-medium mb-1 japanese-text">期間</Label>
-            <Input 
-              id="duration" 
-              value={caseData.duration} 
-              onChange={(e) => handleChange('duration', e.target.value)} 
+            <Input
+              id="duration"
+              value={caseData.duration}
+              onChange={(e) => handleChange('duration', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               placeholder="例：6ヶ月〜"
             />
@@ -322,10 +356,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="location" className="text-sm font-medium mb-1 japanese-text">勤務地</Label>
-            <Input 
-              id="location" 
-              value={caseData.location} 
-              onChange={(e) => handleChange('location', e.target.value)} 
+            <Input
+              id="location"
+              value={caseData.location}
+              onChange={(e) => handleChange('location', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               placeholder="例：東京都"
             />
@@ -338,11 +372,11 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="start_date" className="text-sm font-medium mb-1 japanese-text">参画開始日</Label>
-            <Input 
-              id="start_date" 
+            <Input
+              id="start_date"
               type="date"
-              value={caseData.start_date} 
-              onChange={(e) => handleChange('start_date', e.target.value)} 
+              value={caseData.start_date}
+              onChange={(e) => handleChange('start_date', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
             />
           </div>
@@ -354,12 +388,12 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="interview_count" className="text-sm font-medium mb-1 japanese-text">面談回数</Label>
-            <Input 
+            <Input
               id="interview_count"
               type="number"
-              min="1" 
-              value={caseData.interview_count} 
-              onChange={(e) => handleChange('interview_count', e.target.value)} 
+              min="1"
+              value={caseData.interview_count}
+              onChange={(e) => handleChange('interview_count', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
             />
           </div>
@@ -371,10 +405,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="budget" className="text-sm font-medium mb-1 japanese-text">単価</Label>
-            <Input 
-              id="budget" 
-              value={caseData.budget} 
-              onChange={(e) => handleChange('budget', e.target.value)} 
+            <Input
+              id="budget"
+              value={caseData.budget}
+              onChange={(e) => handleChange('budget', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               placeholder="例：60万円〜80万円"
             />
@@ -387,10 +421,10 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="desired_budget" className="text-sm font-medium mb-1 japanese-text">希望単価</Label>
-            <Input 
-              id="desired_budget" 
-              value={caseData.desired_budget} 
-              onChange={(e) => handleChange('desired_budget', e.target.value)} 
+            <Input
+              id="desired_budget"
+              value={caseData.desired_budget}
+              onChange={(e) => handleChange('desired_budget', e.target.value)}
               className="japanese-text border-primary/30 focus:border-primary mt-1"
               placeholder="例：65万円〜"
             />
@@ -403,7 +437,7 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="foreigner_accepted" className="text-sm font-medium mb-1 japanese-text">外国人採用</Label>
-            <Select 
+            <Select
               value={caseData.foreigner_accepted ? "true" : "false"}
               onValueChange={(value) => handleChange('foreigner_accepted', value === "true")}
             >
@@ -424,7 +458,7 @@ export function StructuredCaseForm() {
           </div>
           <div className="flex-1">
             <Label htmlFor="freelancer_accepted" className="text-sm font-medium mb-1 japanese-text">個人事業者</Label>
-            <Select 
+            <Select
               value={caseData.freelancer_accepted ? "true" : "false"}
               onValueChange={(value) => handleChange('freelancer_accepted', value === "true")}
             >
@@ -445,15 +479,15 @@ export function StructuredCaseForm() {
           <Code className="h-4 w-4 mr-1 text-indigo-700" />
           <Label htmlFor="skills" className="text-sm font-medium mb-1 japanese-text">スキル要件（カンマ区切り）</Label>
         </div>
-        <Input 
-          id="skills" 
-          value={caseData.skills.join(', ')} 
-          onChange={(e) => handleChange('skills', e.target.value.split(',').map(s => s.trim()).filter(s => s))} 
+        <Input
+          id="skills"
+          value={caseData.skills.join(', ')}
+          onChange={(e) => handleChange('skills', e.target.value.split(',').map(s => s.trim()).filter(s => s))}
           className="japanese-text border-primary/30 focus:border-primary mt-1"
           placeholder="例：Java, Spring Boot, SQL"
         />
       </div>
-      
+
       <div className="mt-4">
         <div className="flex items-center space-x-2">
           <FileCode className="h-4 w-4 mr-1 text-purple-600" />
@@ -462,8 +496,8 @@ export function StructuredCaseForm() {
         <div className="grid grid-cols-2 gap-2 border rounded-md p-3 bg-muted/5 mt-1">
           {processOptions.map((process) => (
             <div key={process} className="flex items-center space-x-2">
-              <Checkbox 
-                id={`process-${process}`} 
+              <Checkbox
+                id={`process-${process}`}
                 checked={(caseData.processes || []).includes(process)}
                 onCheckedChange={() => toggleProcess(process)}
               />
@@ -474,14 +508,14 @@ export function StructuredCaseForm() {
           ))}
         </div>
       </div>
-      
+
       <div className="mt-4">
         <div className="flex items-center space-x-2">
           <FileText className="h-4 w-4 mr-1 text-gray-600" />
           <Label htmlFor="description" className="text-sm font-medium mb-1 japanese-text">案件概要</Label>
         </div>
-        <Textarea 
-          id="description" 
+        <Textarea
+          id="description"
           value={caseData.description}
           onChange={(e) => handleChange('description', e.target.value)}
           rows={3}
@@ -495,8 +529,8 @@ export function StructuredCaseForm() {
           <FileText className="h-4 w-4 mr-1 text-gray-600" />
           <Label htmlFor="detail_description" className="text-sm font-medium mb-1 japanese-text">案件詳細</Label>
         </div>
-        <Textarea 
-          id="detail_description" 
+        <Textarea
+          id="detail_description"
           value={caseData.detail_description}
           onChange={(e) => handleChange('detail_description', e.target.value)}
           rows={5}

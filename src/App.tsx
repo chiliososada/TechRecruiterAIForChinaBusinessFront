@@ -18,7 +18,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ToastProvider } from "@/hooks/toast/toast-provider";
 import { DebugPanel } from "@/components/layout/DebugPanel"; // 添加这一行
-import AuthDebug from "./pages/Auth";
+import AuthDebug from "./pages/AuthDebug";
 
 const queryClient = new QueryClient({
   defaultOptions: {

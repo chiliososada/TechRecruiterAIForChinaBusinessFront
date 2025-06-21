@@ -7,9 +7,14 @@ import { FileUp, Save, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 
-export function ResumeUpload() {
+interface ResumeUploadProps {
+  onCreateEngineer?: (data: any) => Promise<boolean>;
+}
+
+export function ResumeUpload({ onCreateEngineer }: ResumeUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   
   // 技術者情報抽出の編集可能なフォームデータ
@@ -23,13 +28,8 @@ export function ResumeUpload() {
     japaneseLevel: 'ネイティブレベル',
     englishLevel: 'ビジネスレベル',
     nearestStation: '品川駅',
-    skills: [
-      { name: 'Java', years: '7' },
-      { name: 'Spring Boot', years: '5' },
-      { name: 'AWS', years: '3' },
-      { name: 'Docker', years: '2' }
-    ],
-    technicalKeywords: 'クラウド, マイクロサービス, CI/CD',
+    skills: 'Java, Spring Boot, AWS, Docker',
+    experience: '7年',
     selfPromotion: '金融系システム開発においてリーダー経験あり。Java技術を中心に長年の経験があります。',
     workScope: '要件定義, 設計, 実装, テスト',
     workExperience: '金融, 保険',
@@ -54,14 +54,6 @@ export function ResumeUpload() {
     setCandidateData(prev => ({ ...prev, [field]: value }));
   };
 
-  // 处理技能变更
-  const handleSkillChange = (index: number, field: 'name' | 'years', value: string) => {
-    setCandidateData(prev => {
-      const updatedSkills = [...prev.skills];
-      updatedSkills[index] = { ...updatedSkills[index], [field]: value };
-      return { ...prev, skills: updatedSkills };
-    });
-  };
 
   // 生成推薦文
   const generateRecommendation = () => {
@@ -69,13 +61,14 @@ export function ResumeUpload() {
     
     setTimeout(() => {
       // テンプレートに基づいて推薦文を生成
+      const skillsArray = candidateData.skills.split(',').map(s => s.trim());
       const newText = recommendationTemplate
         .replace('[名前]', `${candidateData.name}さん`)
-        .replace('[スキル]', candidateData.skills.map(s => s.name).join('と'))
-        .replace('[経験]', candidateData.skills[0]?.years || '5')
+        .replace('[スキル]', skillsArray.slice(0, 2).join('と'))
+        .replace('[経験]', '7')
         .replace('[日本語レベル]', candidateData.japaneseLevel)
         .replace('[得意分野]', '金融系のプロジェクト')
-        .replace('[ツール]', candidateData.skills.slice(2).map(s => s.name).join('や'))
+        .replace('[ツール]', skillsArray.slice(2).join('や'))
         .replace('[備考]', candidateData.remarks);
         
       setRecommendationText(newText);
@@ -84,10 +77,95 @@ export function ResumeUpload() {
   };
 
   // 保存候选人数据
-  const handleSaveCandidate = () => {
-    toast.success('候補者情報と推薦文が保存されました', {
-      description: `${candidateData.name}さんのプロフィールが登録されました`
-    });
+  const handleSaveCandidate = async () => {
+    if (!onCreateEngineer) {
+      toast.error('保存機能が利用できません');
+      return;
+    }
+
+    // 验证必填字段
+    if (!candidateData.name || candidateData.name.trim() === '') {
+      toast.error('氏名を入力してください');
+      return;
+    }
+
+    if (!candidateData.skills || candidateData.skills.trim() === '') {
+      toast.error('保有スキルを入力してください');
+      return;
+    }
+
+    if (!candidateData.japaneseLevel || candidateData.japaneseLevel.trim() === '') {
+      toast.error('日本語レベルを選択してください');
+      return;
+    }
+
+    if (!candidateData.experience || candidateData.experience.trim() === '') {
+      toast.error('経験年数を入力してください');
+      return;
+    }
+
+    try {
+      // 构造与CandidateForm相同格式的数据
+      const formData = {
+        name: candidateData.name,
+        skills: candidateData.skills,
+        japaneseLevel: candidateData.japaneseLevel,
+        englishLevel: candidateData.englishLevel || '',
+        experience: candidateData.experience,
+        age: candidateData.age || '',
+        gender: candidateData.gender || '',
+        nationality: candidateData.nationality || '',
+        nearestStation: candidateData.nearestStation || '',
+        education: candidateData.education || '',
+        arrivalYear: candidateData.arrivalYear || '',
+        certifications: candidateData.certifications || '',
+        workScope: candidateData.workScope || '',
+        workExperience: candidateData.workExperience || '',
+        selfPromotion: candidateData.selfPromotion || '',
+        remarks: candidateData.remarks || '',
+        companyType: '自社',
+        companyName: '', // 添加缺失的字段
+        source: 'resume_upload', // 添加缺失的字段
+        email: '', // 添加缺失的字段
+        phone: '', // 添加缺失的字段
+        registeredAt: new Date().toISOString(), // 添加缺失的字段
+        updatedAt: new Date().toISOString(), // 添加缺失的字段
+        status: '提案中',
+        availability: '即日'
+      };
+
+      console.log('=== ResumeUpload submitting data ===', formData);
+      const success = await onCreateEngineer(formData);
+      if (success) {
+        toast.success('候補者情報と推薦文が保存されました', {
+          description: `${candidateData.name}さんのプロフィールが登録されました`
+        });
+        
+        // 重置表单数据
+        setCandidateData({
+          name: '',
+          age: '',
+          gender: '',
+          nationality: '',
+          education: '',
+          arrivalYear: '',
+          japaneseLevel: '',
+          englishLevel: '',
+          nearestStation: '',
+          skills: '',
+          experience: '',
+          selfPromotion: '',
+          workScope: '',
+          workExperience: '',
+          remarks: '',
+          companyType: '自社',
+          certifications: ''
+        });
+      }
+    } catch (error) {
+      console.error('保存エラー:', error);
+      toast.error('保存に失敗しました');
+    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,41 +247,14 @@ export function ResumeUpload() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="japanese-text">氏名</Label>
+                <Label className="japanese-text">氏名 <span className="text-red-500">*</span></Label>
                 <Input 
                   value={candidateData.name} 
                   className="japanese-text" 
                   onChange={(e) => handleFormChange('name', e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label className="japanese-text">年齢</Label>
-                <Input 
-                  value={candidateData.age} 
-                  className="japanese-text" 
-                  onChange={(e) => handleFormChange('age', e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="japanese-text">性別</Label>
-                <Select 
-                  value={candidateData.gender}
-                  onValueChange={(value) => handleFormChange('gender', value)}
-                >
-                  <SelectTrigger className="japanese-text">
-                    <SelectValue placeholder="性別を選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="男性" className="japanese-text">男性</SelectItem>
-                    <SelectItem value="女性" className="japanese-text">女性</SelectItem>
-                    <SelectItem value="その他" className="japanese-text">その他</SelectItem>
-                    <SelectItem value="回答しない" className="japanese-text">回答しない</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              
               <div className="space-y-2">
                 <Label className="japanese-text">国籍</Label>
                 <Select 
@@ -222,36 +273,81 @@ export function ResumeUpload() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+              
               <div className="space-y-2">
-                <Label className="japanese-text">学歴</Label>
-                <Input 
-                  value={candidateData.education} 
-                  className="japanese-text" 
-                  onChange={(e) => handleFormChange('education', e.target.value)}
-                />
+                <Label className="japanese-text">年齢</Label>
+                <Select
+                  value={candidateData.age || "placeholder"}
+                  onValueChange={(value) => handleFormChange('age', value === 'placeholder' ? '' : value)}
+                >
+                  <SelectTrigger className="japanese-text">
+                    <SelectValue placeholder="年齢を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="placeholder" className="japanese-text">選択してください</SelectItem>
+                    <SelectItem value="20歳" className="japanese-text">20歳</SelectItem>
+                    <SelectItem value="21歳" className="japanese-text">21歳</SelectItem>
+                    <SelectItem value="22歳" className="japanese-text">22歳</SelectItem>
+                    <SelectItem value="23歳" className="japanese-text">23歳</SelectItem>
+                    <SelectItem value="24歳" className="japanese-text">24歳</SelectItem>
+                    <SelectItem value="25歳" className="japanese-text">25歳</SelectItem>
+                    <SelectItem value="26歳" className="japanese-text">26歳</SelectItem>
+                    <SelectItem value="27歳" className="japanese-text">27歳</SelectItem>
+                    <SelectItem value="28歳" className="japanese-text">28歳</SelectItem>
+                    <SelectItem value="29歳" className="japanese-text">29歳</SelectItem>
+                    <SelectItem value="30歳" className="japanese-text">30歳</SelectItem>
+                    <SelectItem value="31歳" className="japanese-text">31歳</SelectItem>
+                    <SelectItem value="32歳" className="japanese-text">32歳</SelectItem>
+                    <SelectItem value="33歳" className="japanese-text">33歳</SelectItem>
+                    <SelectItem value="34歳" className="japanese-text">34歳</SelectItem>
+                    <SelectItem value="35歳" className="japanese-text">35歳</SelectItem>
+                    <SelectItem value="36歳" className="japanese-text">36歳</SelectItem>
+                    <SelectItem value="37歳" className="japanese-text">37歳</SelectItem>
+                    <SelectItem value="38歳" className="japanese-text">38歳</SelectItem>
+                    <SelectItem value="39歳" className="japanese-text">39歳</SelectItem>
+                    <SelectItem value="40歳" className="japanese-text">40歳</SelectItem>
+                    <SelectItem value="41歳" className="japanese-text">41歳</SelectItem>
+                    <SelectItem value="42歳" className="japanese-text">42歳</SelectItem>
+                    <SelectItem value="43歳" className="japanese-text">43歳</SelectItem>
+                    <SelectItem value="44歳" className="japanese-text">44歳</SelectItem>
+                    <SelectItem value="45歳" className="japanese-text">45歳</SelectItem>
+                    <SelectItem value="46歳" className="japanese-text">46歳</SelectItem>
+                    <SelectItem value="47歳" className="japanese-text">47歳</SelectItem>
+                    <SelectItem value="48歳" className="japanese-text">48歳</SelectItem>
+                    <SelectItem value="49歳" className="japanese-text">49歳</SelectItem>
+                    <SelectItem value="50歳" className="japanese-text">50歳</SelectItem>
+                    <SelectItem value="51歳" className="japanese-text">51歳</SelectItem>
+                    <SelectItem value="52歳" className="japanese-text">52歳</SelectItem>
+                    <SelectItem value="53歳" className="japanese-text">53歳</SelectItem>
+                    <SelectItem value="54歳" className="japanese-text">54歳</SelectItem>
+                    <SelectItem value="55歳" className="japanese-text">55歳</SelectItem>
+                    <SelectItem value="56歳" className="japanese-text">56歳</SelectItem>
+                    <SelectItem value="57歳" className="japanese-text">57歳</SelectItem>
+                    <SelectItem value="58歳" className="japanese-text">58歳</SelectItem>
+                    <SelectItem value="59歳" className="japanese-text">59歳</SelectItem>
+                    <SelectItem value="60歳" className="japanese-text">60歳</SelectItem>
+                    <SelectItem value="60歳以上" className="japanese-text">60歳以上</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              
               <div className="space-y-2">
-                <Label className="japanese-text">来日年度</Label>
-                <Input 
-                  value={candidateData.arrivalYear} 
-                  className="japanese-text" 
-                  onChange={(e) => handleFormChange('arrivalYear', e.target.value)}
-                />
+                <Label className="japanese-text">性別</Label>
+                <Select 
+                  value={candidateData.gender}
+                  onValueChange={(value) => handleFormChange('gender', value)}
+                >
+                  <SelectTrigger className="japanese-text">
+                    <SelectValue placeholder="性別を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="男性" className="japanese-text">男性</SelectItem>
+                    <SelectItem value="女性" className="japanese-text">女性</SelectItem>
+                    <SelectItem value="回答しない" className="japanese-text">回答しない</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="japanese-text">資格</Label>
-                <Input 
-                  value={candidateData.certifications} 
-                  className="japanese-text" 
-                  onChange={(e) => handleFormChange('certifications', e.target.value)}
-                />
-              </div>
+              
               <div className="space-y-2">
                 <Label className="japanese-text">最寄駅</Label>
                 <Input 
@@ -260,11 +356,79 @@ export function ResumeUpload() {
                   onChange={(e) => handleFormChange('nearestStation', e.target.value)}
                 />
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+              
               <div className="space-y-2">
-                <Label className="japanese-text">日本語レベル</Label>
+                <Label className="japanese-text">学歴</Label>
+                <Select
+                  value={candidateData.education || "placeholder"}
+                  onValueChange={(value) => handleFormChange('education', value === 'placeholder' ? '' : value)}
+                >
+                  <SelectTrigger className="japanese-text">
+                    <SelectValue placeholder="学歴を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="placeholder" className="japanese-text">選択してください</SelectItem>
+                    <SelectItem value="高卒以下" className="japanese-text">高卒以下</SelectItem>
+                    <SelectItem value="専門学校" className="japanese-text">専門学校</SelectItem>
+                    <SelectItem value="大学（学士）" className="japanese-text">大学（学士）</SelectItem>
+                    <SelectItem value="修士" className="japanese-text">修士</SelectItem>
+                    <SelectItem value="博士" className="japanese-text">博士</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">来日年度</Label>
+                <Select
+                  value={candidateData.arrivalYear || "placeholder"}
+                  onValueChange={(value) => handleFormChange('arrivalYear', value === 'placeholder' ? '' : value)}
+                >
+                  <SelectTrigger className="japanese-text">
+                    <SelectValue placeholder="来日年度を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="placeholder" className="japanese-text">選択してください</SelectItem>
+                    <SelectItem value="2024年" className="japanese-text">2024年</SelectItem>
+                    <SelectItem value="2023年" className="japanese-text">2023年</SelectItem>
+                    <SelectItem value="2022年" className="japanese-text">2022年</SelectItem>
+                    <SelectItem value="2021年" className="japanese-text">2021年</SelectItem>
+                    <SelectItem value="2020年" className="japanese-text">2020年</SelectItem>
+                    <SelectItem value="2019年" className="japanese-text">2019年</SelectItem>
+                    <SelectItem value="2018年" className="japanese-text">2018年</SelectItem>
+                    <SelectItem value="2017年" className="japanese-text">2017年</SelectItem>
+                    <SelectItem value="2016年" className="japanese-text">2016年</SelectItem>
+                    <SelectItem value="2015年" className="japanese-text">2015年</SelectItem>
+                    <SelectItem value="2014年" className="japanese-text">2014年</SelectItem>
+                    <SelectItem value="2013年" className="japanese-text">2013年</SelectItem>
+                    <SelectItem value="2012年" className="japanese-text">2012年</SelectItem>
+                    <SelectItem value="2011年" className="japanese-text">2011年</SelectItem>
+                    <SelectItem value="2010年" className="japanese-text">2010年</SelectItem>
+                    <SelectItem value="2009年" className="japanese-text">2009年</SelectItem>
+                    <SelectItem value="2008年" className="japanese-text">2008年</SelectItem>
+                    <SelectItem value="2007年" className="japanese-text">2007年</SelectItem>
+                    <SelectItem value="2006年" className="japanese-text">2006年</SelectItem>
+                    <SelectItem value="2005年" className="japanese-text">2005年</SelectItem>
+                    <SelectItem value="2004年" className="japanese-text">2004年</SelectItem>
+                    <SelectItem value="2003年" className="japanese-text">2003年</SelectItem>
+                    <SelectItem value="2002年" className="japanese-text">2002年</SelectItem>
+                    <SelectItem value="2001年" className="japanese-text">2001年</SelectItem>
+                    <SelectItem value="2000年" className="japanese-text">2000年</SelectItem>
+                    <SelectItem value="2000年以前" className="japanese-text">2000年以前</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">資格</Label>
+                <Input 
+                  value={candidateData.certifications} 
+                  className="japanese-text" 
+                  onChange={(e) => handleFormChange('certifications', e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">日本語レベル <span className="text-red-500">*</span></Label>
                 <Select 
                   value={candidateData.japaneseLevel}
                   onValueChange={(value) => handleFormChange('japaneseLevel', value)}
@@ -273,13 +437,13 @@ export function ResumeUpload() {
                     <SelectValue placeholder="日本語レベルを選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="不問" className="japanese-text">不問</SelectItem>
                     <SelectItem value="日常会話レベル" className="japanese-text">日常会話レベル</SelectItem>
                     <SelectItem value="ビジネスレベル" className="japanese-text">ビジネスレベル</SelectItem>
                     <SelectItem value="ネイティブレベル" className="japanese-text">ネイティブレベル</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              
               <div className="space-y-2">
                 <Label className="japanese-text">英語レベル</Label>
                 <Select 
@@ -290,7 +454,6 @@ export function ResumeUpload() {
                     <SelectValue placeholder="英語レベルを選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="不問" className="japanese-text">不問</SelectItem>
                     <SelectItem value="日常会話レベル" className="japanese-text">日常会話レベル</SelectItem>
                     <SelectItem value="ビジネスレベル" className="japanese-text">ビジネスレベル</SelectItem>
                     <SelectItem value="ネイティブレベル" className="japanese-text">ネイティブレベル</SelectItem>
@@ -300,52 +463,100 @@ export function ResumeUpload() {
             </div>
             
             <div className="space-y-2">
-              <Label className="japanese-text">スキル</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {candidateData.skills.map((skill, index) => (
-                  <div key={index} className="flex items-center border rounded-md p-2">
-                    <Input 
-                      value={skill.name}
-                      onChange={(e) => handleSkillChange(index, 'name', e.target.value)}
-                      className="border-0 bg-transparent p-0 focus-visible:ring-0"
-                    />
-                    <span className="mx-2">:</span>
-                    <Input
-                      value={skill.years}
-                      onChange={(e) => handleSkillChange(index, 'years', e.target.value)}
-                      className="border-0 bg-transparent p-0 focus-visible:ring-0 w-12 text-right"
-                    />
-                    <span className="ml-1">年</span>
-                  </div>
-                ))}
+              <Label className="japanese-text">保有スキル <span className="text-red-500">*</span></Label>
+              <Input 
+                value={candidateData.skills} 
+                className="japanese-text" 
+                onChange={(e) => handleFormChange('skills', e.target.value)}
+                placeholder="例: Java, Spring Boot, AWS（カンマ区切り）"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="japanese-text">経験年数 <span className="text-red-500">*</span></Label>
+                <Select
+                  value={candidateData.experience || "placeholder"}
+                  onValueChange={(value) => handleFormChange('experience', value === 'placeholder' ? '' : value)}
+                >
+                  <SelectTrigger className="japanese-text">
+                    <SelectValue placeholder="経験年数を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="placeholder" className="japanese-text">選択してください</SelectItem>
+                    <SelectItem value="未経験" className="japanese-text">未経験</SelectItem>
+                    <SelectItem value="1年未満" className="japanese-text">1年未満</SelectItem>
+                    <SelectItem value="1年" className="japanese-text">1年</SelectItem>
+                    <SelectItem value="2年" className="japanese-text">2年</SelectItem>
+                    <SelectItem value="3年" className="japanese-text">3年</SelectItem>
+                    <SelectItem value="4年" className="japanese-text">4年</SelectItem>
+                    <SelectItem value="5年" className="japanese-text">5年</SelectItem>
+                    <SelectItem value="6年" className="japanese-text">6年</SelectItem>
+                    <SelectItem value="7年" className="japanese-text">7年</SelectItem>
+                    <SelectItem value="8年" className="japanese-text">8年</SelectItem>
+                    <SelectItem value="9年" className="japanese-text">9年</SelectItem>
+                    <SelectItem value="10年" className="japanese-text">10年</SelectItem>
+                    <SelectItem value="11年" className="japanese-text">11年</SelectItem>
+                    <SelectItem value="12年" className="japanese-text">12年</SelectItem>
+                    <SelectItem value="13年" className="japanese-text">13年</SelectItem>
+                    <SelectItem value="14年" className="japanese-text">14年</SelectItem>
+                    <SelectItem value="15年" className="japanese-text">15年</SelectItem>
+                    <SelectItem value="16年" className="japanese-text">16年</SelectItem>
+                    <SelectItem value="17年" className="japanese-text">17年</SelectItem>
+                    <SelectItem value="18年" className="japanese-text">18年</SelectItem>
+                    <SelectItem value="19年" className="japanese-text">19年</SelectItem>
+                    <SelectItem value="20年" className="japanese-text">20年</SelectItem>
+                    <SelectItem value="20年以上" className="japanese-text">20年以上</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">技術キーワード</Label>
-              <Input 
-                value={candidateData.technicalKeywords} 
-                className="japanese-text" 
-                onChange={(e) => handleFormChange('technicalKeywords', e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">業務範囲</Label>
-              <Input 
-                value={candidateData.workScope} 
-                className="japanese-text" 
-                onChange={(e) => handleFormChange('workScope', e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">業務経験</Label>
-              <Input 
-                value={candidateData.workExperience} 
-                className="japanese-text" 
-                onChange={(e) => handleFormChange('workExperience', e.target.value)}
-              />
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">業務範囲</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    '調査・分析',
+                    '要件定義',
+                    '基本設計',
+                    '詳細設計',
+                    '製造',
+                    '単体テスト',
+                    '結合テスト',
+                    '総合テスト',
+                    '運用試験',
+                    '運用・保守'
+                  ].map((scope) => (
+                    <div key={scope} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`workScope-${scope}`}
+                        checked={candidateData.workScope?.includes(scope) || false}
+                        onCheckedChange={(checked) => {
+                          const currentWorkScope = candidateData.workScope ? candidateData.workScope.split(', ') : [];
+                          if (checked) {
+                            const updatedWorkScope = [...currentWorkScope, scope];
+                            handleFormChange('workScope', updatedWorkScope.join(', '));
+                          } else {
+                            const updatedWorkScope = currentWorkScope.filter(item => item !== scope);
+                            handleFormChange('workScope', updatedWorkScope.join(', '));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`workScope-${scope}`} className="japanese-text text-sm">
+                        {scope}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">業務経験</Label>
+                <Input 
+                  value={candidateData.workExperience} 
+                  className="japanese-text" 
+                  onChange={(e) => handleFormChange('workExperience', e.target.value)}
+                />
+              </div>
             </div>
             
             <div className="space-y-2">

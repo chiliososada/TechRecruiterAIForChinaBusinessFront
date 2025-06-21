@@ -18,6 +18,7 @@ import {
   initializeBusinessClient,
   businessClientManager
 } from '@/integrations/supabase/business-client';
+import { debugAuthState } from '@/utils/auth-debug';
 
 // ユーザー情報の型定義
 interface User {
@@ -113,57 +114,132 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
 
-  // 初期化処理 - 修正版
+  // 初期化処理 - 改良版（より確実な認証状態復元）
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        console.log('認証システム初期化を開始します...');
+        
+        // 認証状態のデバッグ
+        debugAuthState();
+        
+        // 数秒待ってからトークンを取得（ブラウザの初期化を待つ）
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const { accessToken, refreshToken } = getStoredTokens();
 
-        if (accessToken) {
-          console.log('保存されたトークンが見つかりました、検証中...');
+        if (!accessToken) {
+          console.log('保存されたトークンがありません');
+          setLoading(false);
+          return;
+        }
 
-          // トークンの検証
+        console.log('保存されたトークンが見つかりました、検証中...');
+
+        // API サーバーの状況をチェック - 最近保存されたトークンなら直接使用
+        const savedAt = localStorage.getItem('auth_token_saved_at');
+        const shouldTrustToken = savedAt && (() => {
+          const saveTime = new Date(savedAt);
+          const now = new Date();
+          const hoursDiff = (now.getTime() - saveTime.getTime()) / (1000 * 60 * 60);
+          return hoursDiff < 24; // 24時間以内なら信頼
+        })();
+
+        if (shouldTrustToken) {
+          console.log('最近保存されたトークンのため、API検証をスキップして直接認証します');
+          
+          // 保存された真実のユーザー情報を取得
+          const savedUserDataStr = localStorage.getItem('auth_user_data');
+          if (savedUserDataStr) {
+            try {
+              const savedUserData = JSON.parse(savedUserDataStr);
+              console.log('保存されたユーザー情報を使用します:', {
+                email: savedUserData.user?.email,
+                tenant_id: savedUserData.user?.tenant_id,
+                tenant: savedUserData.tenant,
+                fullData: savedUserData
+              });
+              
+              await setAuthenticatedUser(savedUserData, accessToken);
+              setToken(accessToken);
+              console.log('保存されたユーザーデータで認証が完了しました');
+              return;
+            } catch (parseError) {
+              console.error('保存されたユーザー情報の解析に失敗:', parseError);
+            }
+          }
+          
+          // フォールバック: ユーザー情報が保存されていない場合はAPI検証を試行
+          console.log('保存されたユーザー情報がないため、API検証を試行します');
+        }
+
+        try {
+          // トークンの検証（新しいトークンまたは古いトークンの場合のみ）
           const verifyResult = await verifyToken(accessToken);
+          console.log('トークン検証結果:', verifyResult.success ? '成功' : '失敗');
 
           if (verifyResult.success && verifyResult.data) {
             console.log('トークンが有効です、ユーザー情報を設定中...');
             await setAuthenticatedUser(verifyResult.data, accessToken);
-          } else if (refreshToken) {
-            console.log('アクセストークンが無効です、リフレッシュを試行中...');
+            setToken(accessToken);
+            console.log('認証状態の復元が完了しました - トークン状態も同期済み');
+            return;
+          }
+        } catch (verifyError: any) {
+          console.warn('トークン検証でエラーが発生しました:', verifyError);
+          // API エラーの場合、リフレッシュを試行する前にスキップ
+        }
 
+        // アクセストークンが無効またはエラーの場合、リフレッシュを試行
+        if (refreshToken) {
+          console.log('リフレッシュトークンでアクセストークンを更新します...');
+          
+          try {
             const refreshResult = await apiRefreshToken(refreshToken);
             if (refreshResult.success && refreshResult.data) {
               console.log('トークンリフレッシュが成功しました');
 
-              // リフレッシュ後は新しいトークンで再検証
-              const newVerifyResult = await verifyToken(refreshResult.data.access_token);
-              if (newVerifyResult.success && newVerifyResult.data) {
-                await setAuthenticatedUser(newVerifyResult.data, refreshResult.data.access_token);
-                saveTokens(refreshResult.data.access_token, refreshToken);
-              } else {
-                console.log('リフレッシュ後の検証に失敗しました、認証をクリア');
-                await clearAuthState();
+              // 新しいアクセストークンで再検証
+              try {
+                const newVerifyResult = await verifyToken(refreshResult.data.access_token);
+                if (newVerifyResult.success && newVerifyResult.data) {
+                  console.log('リフレッシュされたトークンの検証に成功しました');
+                  await setAuthenticatedUser(newVerifyResult.data, refreshResult.data.access_token);
+                  saveTokens(refreshResult.data.access_token, refreshToken);
+                  // 明示的にトークン状態を設定
+                  setToken(refreshResult.data.access_token);
+                  console.log('リフレッシュ後の認証状態の復元が完了しました - トークン状態も同期済み');
+                  return;
+                }
+              } catch (newVerifyError) {
+                console.error('新しいトークンの検証でエラー:', newVerifyError);
               }
-            } else {
-              console.log('トークンリフレッシュに失敗しました、認証をクリア');
-              await clearAuthState();
             }
-          } else {
-            console.log('リフレッシュトークンがありません、認証をクリア');
-            await clearAuthState();
+          } catch (refreshError) {
+            console.error('リフレッシュ処理中のエラー:', refreshError);
           }
-        } else {
-          console.log('保存されたトークンがありません');
         }
+
+        // すべての認証試行が失敗した場合のみクリア
+        console.log('すべての認証試行が失敗しました、認証状態をクリアします');
+        await clearAuthState();
+
       } catch (error) {
-        console.error('認証初期化エラー:', error);
+        console.error('認証初期化で予期しないエラー:', error);
+        // 予期しないエラーの場合は認証状態をクリア
         await clearAuthState();
       } finally {
         setLoading(false);
+        console.log('認証初期化プロセスが完了しました');
       }
     };
 
-    initializeAuth();
+    // ブラウザ環境でのみ実行
+    if (typeof window !== 'undefined') {
+      initializeAuth();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   // 認証済みユーザーの設定 - 修正版（APIレスポンス構造に合わせて）
@@ -174,6 +250,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // APIレスポンスの構造に合わせて調整
       const userInfo = authData.user || authData;
       const tenantInfo = authData.tenant;
+      
+      console.log('ユーザー情報の詳細:', {
+        userInfo_tenant_id: userInfo.tenant_id,
+        tenantInfo_id: tenantInfo?.id,
+        tenantInfo_full: tenantInfo
+      });
 
       // ユーザー情報の設定
       const userData: User = {
@@ -232,15 +314,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(profileData);
       setCurrentTenant(tenantData);
       setToken(accessToken);
+      
+      console.log('設定されたユーザー状態:', {
+        user_tenant_id: userData.tenant_id,
+        profile_tenant_id: profileData.tenant_id,
+        currentTenant_id: tenantData?.id,
+        userData_full: userData,
+        profileData_full: profileData,
+        tenantData_full: tenantData
+      });
 
-      // 業務クライアントにトークンを設定 - エラーハンドリング強化
+      // 業務クライアントにユーザー情報を設定 - エラーハンドリング強化
       try {
-        const businessTokenResult = await setBusinessClientToken(accessToken);
+        const businessTokenResult = await setBusinessClientToken(userData);
         if (businessTokenResult) {
-          console.log('業務クライアントのトークン設定が成功しました');
-          await initializeBusinessClient();
+          console.log('業務クライアントのユーザー設定が成功しました');
+          await initializeBusinessClient(userData);
         } else {
-          console.warn('業務クライアントのトークン設定に失敗しましたが、認証は継続します');
+          console.warn('業務クライアントのユーザー設定に失敗しましたが、認証は継続します');
         }
       } catch (businessError) {
         console.error('業務クライアント設定エラー（認証は継続）:', businessError);
@@ -262,6 +353,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTenants([]);
     setToken(null);
     clearStoredTokens();
+    // 保存されたユーザー情報もクリア
+    localStorage.removeItem('auth_user_data');
     clearBusinessClientAuth();
     console.log('認証状態がクリアされました');
   };
@@ -280,6 +373,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
 
       const result = await authLogin(credentials);
+      console.log('ログインAPI結果:', {
+        success: result.success,
+        hasData: !!result.data,
+        hasAccessToken: result.data?.access_token ? 'あり' : 'なし',
+        hasRefreshToken: result.data?.refresh_token ? 'あり' : 'なし',
+        message: result.message
+      });
 
       if (!result.success || !result.data) {
         const error = new Error(result.message || 'ログインに失敗しました');
@@ -295,7 +395,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // トークンの保存
+      console.log('トークンを保存中...', {
+        accessToken: result.data.access_token ? result.data.access_token.substring(0, 20) + '...' : 'なし',
+        refreshToken: result.data.refresh_token ? result.data.refresh_token.substring(0, 20) + '...' : 'なし'
+      });
       saveTokens(result.data.access_token, result.data.refresh_token);
+      
+      // 保存されたトークンを確認
+      const savedTokens = getStoredTokens();
+      console.log('保存されたトークンの確認:', {
+        hasAccessToken: !!savedTokens.accessToken,
+        hasRefreshToken: !!savedTokens.refreshToken
+      });
+
+      // 真実のユーザー情報をlocalStorageに保存
+      localStorage.setItem('auth_user_data', JSON.stringify(result.data));
+      console.log('ユーザー情報をlocalStorageに保存しました');
 
       // 認証済みユーザーの設定
       await setAuthenticatedUser(result.data, result.data.access_token);
@@ -388,24 +503,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: new Error('ユーザー招待機能は未実装です') };
   };
 
-  // トークンリフレッシュ
+  // トークンリフレッシュ - 修正版
   const refreshTokenFunction = async (): Promise<{ success: boolean; error?: string }> => {
     try {
       const { refreshToken } = getStoredTokens();
       if (!refreshToken) {
+        console.warn('リフレッシュトークンがありません');
         return { success: false, error: 'リフレッシュトークンがありません' };
       }
 
+      console.log('トークンリフレッシュを開始します');
       const result = await apiRefreshToken(refreshToken);
+      
       if (result.success && result.data) {
+        console.log('新しいアクセストークンを取得しました');
         saveTokens(result.data.access_token, refreshToken);
-        await setBusinessClientToken(result.data.access_token);
-        setToken(result.data.access_token);
-        return { success: true };
+        
+        // トークン検証を行い、ユーザー情報を取得
+        console.log('新しいトークンを検証します');
+        const verifyResult = await verifyToken(result.data.access_token);
+        
+        if (verifyResult.success && verifyResult.data) {
+          console.log('トークン検証成功、ユーザー情報を更新します');
+          // 業務クライアントにユーザー情報を設定
+          const userInfo = verifyResult.data.user || verifyResult.data;
+          await setBusinessClientToken(userInfo);
+          await initializeBusinessClient(userInfo);
+          setToken(result.data.access_token);
+          return { success: true };
+        } else {
+          console.error('新しいトークンの検証に失敗しました:', verifyResult.message);
+          return { success: false, error: '新しいトークンの検証に失敗しました' };
+        }
       }
 
+      console.error('トークンリフレッシュに失敗しました:', result.message);
       return { success: false, error: result.message || 'トークンリフレッシュに失敗しました' };
     } catch (error: any) {
+      console.error('トークンリフレッシュ中にエラーが発生しました:', error);
       return { success: false, error: error.message };
     }
   };

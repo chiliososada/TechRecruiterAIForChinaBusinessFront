@@ -66,12 +66,11 @@ export interface NewEngineerType {
   companyType: string;
   companyName: string;
   source: string;
-  technicalKeywords: string;
   selfPromotion: string;
   workScope: string;
   workExperience: string;
-  email: string;  // Added email field
-  phone: string;  // Added phone field
+  email: string;
+  phone: string;
   registeredAt: string;
   updatedAt: string;
 }
