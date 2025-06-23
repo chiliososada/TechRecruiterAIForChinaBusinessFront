@@ -16,8 +16,14 @@ export const useSenderMapper = ({ paginatedCases }: SenderMapperProps) => {
     paginatedCases.forEach(caseItem => {
       const keyTechnologies = caseItem.keyTechnologies || caseItem.skills?.join(', ') || '';
       
+      // Debug logging
+      console.log('=== PROCESSING CASE ===', caseItem.id, caseItem.title);
+      console.log('caseItem.startDate:', caseItem.startDate);
+      console.log('caseItem.senders:', caseItem.senders);
+      
       // If case has a senders array, process each sender
       if (caseItem.senders && Array.isArray(caseItem.senders) && caseItem.senders.length > 0) {
+        console.log('=== USING MULTIPLE SENDERS BRANCH ===');
         caseItem.senders.forEach((sender, index) => {
           // Generate a unique row ID for each sender
           const senderEmail = sender.email || `${sender.name?.replace(/\s+/g, '').toLowerCase()}@example.com`;
@@ -34,12 +40,15 @@ export const useSenderMapper = ({ paginatedCases }: SenderMapperProps) => {
             registrationType: caseItem.registrationType,
             registeredAt: caseItem.registeredAt,
             originalCase: caseItem,
-            rowId
+            rowId,
+            startDate: caseItem.startDate || '' // Add missing startDate field
           });
         });
       } 
       // Fallback for cases without senders array
       else {
+        console.log('=== USING SINGLE SENDER BRANCH ===');
+        console.log('startDate value:', caseItem.startDate);
         const rowId = `${caseItem.id}-${caseItem.senderEmail || 'default'}-0`;
         senders.push({
           caseId: caseItem.id,
@@ -52,7 +61,8 @@ export const useSenderMapper = ({ paginatedCases }: SenderMapperProps) => {
           registrationType: caseItem.registrationType,
           registeredAt: caseItem.registeredAt,
           originalCase: caseItem,
-          rowId
+          rowId,
+          startDate: caseItem.startDate || '' // Add missing startDate field
         });
       }
     });

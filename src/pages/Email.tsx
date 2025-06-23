@@ -1,22 +1,139 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, Mail, History, Wifi } from 'lucide-react';
+import { Shield, Mail, History, Wifi, Save, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { saveSMTPSettings, getSMTPSettings, testSMTPConnection } from '@/utils/backend-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Email() {
   const { toast } = useToast();
+  const { user, currentTenant } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  
+  // SMTP Settings state
+  const [smtpSettings, setSmtpSettings] = useState({
+    settingName: '',
+    emailProvider: 'imap',
+    smtpHost: '',
+    smtpPort: '587',
+    encryptionType: 'STARTTLS',
+    smtpUsername: '',
+    smtpPassword: '',
+    fromEmail: '',
+    fromName: '',
+    replyToEmail: '',
+    dailySendLimit: '100',
+    hourlySendLimit: '20',
+    isDefault: true
+  });
 
-  const handleSave = () => {
-    toast({
-      title: "設定を保存しました",
-      description: "メール連携の設定が正常に保存されました。",
-    });
+  // Load existing SMTP settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+      
+      setLoading(true);
+      try {
+        const result = await getSMTPSettings(user);
+        if (result.success && result.data && result.data.length > 0) {
+          const settings = result.data[0]; // Get the first/default settings
+          setSmtpSettings({
+            settingName: settings.setting_name || '',
+            emailProvider: 'imap',
+            smtpHost: settings.smtp_host || '',
+            smtpPort: settings.smtp_port?.toString() || '587',
+            encryptionType: settings.security_protocol || 'STARTTLS',
+            smtpUsername: settings.smtp_username || '',
+            smtpPassword: '', // Don't load password for security
+            fromEmail: settings.from_email || '',
+            fromName: settings.from_name || '',
+            replyToEmail: settings.reply_to_email || '',
+            dailySendLimit: settings.daily_send_limit?.toString() || '100',
+            hourlySendLimit: settings.hourly_send_limit?.toString() || '20',
+            isDefault: settings.is_default || true
+          });
+          toast({
+            title: "設定を読み込みました",
+            description: "既存のSMTP設定を読み込みました。",
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load SMTP settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: "エラー",
+        description: "ユーザー情報が見つかりません。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!smtpSettings.settingName || !smtpSettings.smtpHost || !smtpSettings.smtpUsername || !smtpSettings.smtpPassword) {
+      toast({
+        title: "入力エラー",
+        description: "必須項目を入力してください。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      const result = await saveSMTPSettings({
+        setting_name: smtpSettings.settingName,
+        smtp_host: smtpSettings.smtpHost,
+        smtp_port: parseInt(smtpSettings.smtpPort),
+        smtp_username: smtpSettings.smtpUsername,
+        smtp_password: smtpSettings.smtpPassword,
+        security_protocol: smtpSettings.encryptionType as 'SSL' | 'STARTTLS' | 'NONE',
+        from_email: smtpSettings.fromEmail || smtpSettings.smtpUsername,
+        from_name: smtpSettings.fromName || 'AIマッチくん',
+        reply_to_email: smtpSettings.replyToEmail || smtpSettings.fromEmail || smtpSettings.smtpUsername,
+        daily_send_limit: parseInt(smtpSettings.dailySendLimit) || 100,
+        hourly_send_limit: parseInt(smtpSettings.hourlySendLimit) || 20,
+        is_default: smtpSettings.isDefault
+      }, user);
+
+      if (result.success) {
+        toast({
+          title: "設定を保存しました",
+          description: "SMTP設定が正常に保存されました。",
+        });
+      } else {
+        toast({
+          title: "保存エラー",
+          description: result.message || "SMTP設定の保存に失敗しました。",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Save SMTP settings error:', error);
+      toast({
+        title: "保存エラー",
+        description: "SMTP設定の保存中にエラーが発生しました。",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSettings(false);
+    }
   };
   
   const restoreLastSettings = () => {
@@ -33,19 +150,60 @@ export function Email() {
     }, 1000);
   };
 
-  const testConnection = () => {
+  const testConnection = async () => {
+    if (!user) {
+      toast({
+        title: "エラー",
+        description: "ユーザー情報が見つかりません。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get the saved SMTP setting ID or check if we have an existing setting
+    const smtpSettingId = localStorage.getItem('default_smtp_setting_id');
+    
+    if (!smtpSettingId) {
+      toast({
+        title: "SMTP設定が見つかりません",
+        description: "先にSMTP設定を保存してから接続テストを行ってください。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingConnection(true);
+    
     toast({
       title: "接続テスト中...",
       description: "メールサーバーへの接続をテストしています。",
     });
-    
-    // 接続テスト処理をシミュレート
-    setTimeout(() => {
+
+    try {
+      const result = await testSMTPConnection(smtpSettingId, user.email, user);
+      
+      if (result.status === 'success') {
+        toast({
+          title: "接続テスト成功",
+          description: `メールサーバーに正常に接続できました。\nサーバー: ${result.connection_config?.host || 'N/A'}`,
+        });
+      } else {
+        toast({
+          title: "接続テスト失敗",
+          description: result.message || "メールサーバーへの接続に失敗しました。",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Connection test error:', error);
       toast({
-        title: "接続テスト成功",
-        description: "メールサーバーに正常に接続できました。",
+        title: "接続テストエラー",
+        description: "接続テスト中にエラーが発生しました。",
+        variant: "destructive",
       });
-    }, 2000);
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   return (
@@ -66,15 +224,27 @@ export function Email() {
           </div>
         </div>
 
-        <Tabs defaultValue="execution" className="space-y-6">
-          <TabsList className="grid w-full md:w-auto grid-cols-3">
-            <TabsTrigger value="execution" className="japanese-text">実行条件</TabsTrigger>
-            <TabsTrigger value="filter" className="japanese-text">フィルター条件</TabsTrigger>
-            <TabsTrigger value="security" className="japanese-text">セキュリティ設定</TabsTrigger>
-          </TabsList>
+        {/* Check if user has access to premium email features */}
+        {(() => {
+          const subscriptionPlan = currentTenant?.subscription_plan?.toLowerCase();
+          const hasPremiumFeatures = subscriptionPlan !== 'basic' && subscriptionPlan !== 'free';
+          const defaultTab = hasPremiumFeatures ? "execution" : "security";
+          
+          return (
+            <Tabs defaultValue={defaultTab} className="space-y-6">
+              <TabsList className={`grid w-full md:w-auto ${hasPremiumFeatures ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                {hasPremiumFeatures && (
+                  <TabsTrigger value="execution" className="japanese-text">実行条件</TabsTrigger>
+                )}
+                {hasPremiumFeatures && (
+                  <TabsTrigger value="filter" className="japanese-text">フィルター条件</TabsTrigger>
+                )}
+                <TabsTrigger value="security" className="japanese-text">セキュリティ設定</TabsTrigger>
+              </TabsList>
 
-          {/* Tab 1: Frequency and Execution Conditions */}
-          <TabsContent value="execution" className="space-y-6">
+              {/* Tab 1: Frequency and Execution Conditions */}
+              {hasPremiumFeatures && (
+                <TabsContent value="execution" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center japanese-text">
@@ -151,11 +321,13 @@ export function Email() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          </TabsContent>
+                </Card>
+                </TabsContent>
+              )}
 
-          {/* Tab 2: Email Filter Conditions */}
-          <TabsContent value="filter" className="space-y-6">
+              {/* Tab 2: Email Filter Conditions */}
+              {hasPremiumFeatures && (
+                <TabsContent value="filter" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center japanese-text">
@@ -217,11 +389,12 @@ export function Email() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          </TabsContent>
+                </Card>
+                </TabsContent>
+              )}
 
-          {/* Tab 3: Connection and Security Settings - Updated with detailed SMTP configuration */}
-          <TabsContent value="security" className="space-y-6">
+              {/* Tab 3: Connection and Security Settings - Updated with detailed SMTP configuration */}
+              <TabsContent value="security" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center japanese-text">
@@ -235,7 +408,10 @@ export function Email() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="email-provider" className="japanese-text">メールプロバイダー</Label>
-                  <Select defaultValue="gmail">
+                  <Select 
+                    value={smtpSettings.emailProvider} 
+                    onValueChange={(value) => setSmtpSettings({...smtpSettings, emailProvider: value})}
+                  >
                     <SelectTrigger id="email-provider">
                       <SelectValue placeholder="メールプロバイダーを選択" />
                     </SelectTrigger>
@@ -252,10 +428,29 @@ export function Email() {
                 <div className="border-t pt-4">
                   <h3 className="text-md font-medium mb-3 japanese-text">SMTP設定</h3>
                   
-                  {/* SMTP Server */}
+                  {/* Setting Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="smtp-server" className="japanese-text">SMTPサーバー</Label>
-                    <Input id="smtp-server" placeholder="smtp.gmail.com" />
+                    <Label htmlFor="setting-name" className="japanese-text">設定名 <span className="text-red-500">*</span></Label>
+                    <Input 
+                      id="setting-name" 
+                      placeholder="お名前.com SSL設定" 
+                      value={smtpSettings.settingName}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, settingName: e.target.value})}
+                    />
+                    <p className="text-xs text-muted-foreground japanese-text">
+                      この設定の識別名
+                    </p>
+                  </div>
+                  
+                  {/* SMTP Server */}
+                  <div className="space-y-2 mt-3">
+                    <Label htmlFor="smtp-server" className="japanese-text">SMTPサーバー <span className="text-red-500">*</span></Label>
+                    <Input 
+                      id="smtp-server" 
+                      placeholder="mail92.onamae.ne.jp" 
+                      value={smtpSettings.smtpHost}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, smtpHost: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       メールサービスプロバイダのSMTPサーバー名
                     </p>
@@ -263,8 +458,14 @@ export function Email() {
                   
                   {/* Port Number */}
                   <div className="space-y-2 mt-3">
-                    <Label htmlFor="port-number" className="japanese-text">ポート番号</Label>
-                    <Input type="number" id="port-number" placeholder="587" />
+                    <Label htmlFor="port-number" className="japanese-text">ポート番号 <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="number" 
+                      id="port-number" 
+                      placeholder="465" 
+                      value={smtpSettings.smtpPort}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, smtpPort: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       一般的に587（STARTTLS）または465（SSL）を使用
                     </p>
@@ -272,23 +473,32 @@ export function Email() {
                   
                   {/* Encryption Type */}
                   <div className="space-y-2 mt-3">
-                    <Label htmlFor="encryption-type" className="japanese-text">暗号化方式</Label>
-                    <Select defaultValue="starttls">
+                    <Label htmlFor="encryption-type" className="japanese-text">暗号化方式 <span className="text-red-500">*</span></Label>
+                    <Select 
+                      value={smtpSettings.encryptionType} 
+                      onValueChange={(value) => setSmtpSettings({...smtpSettings, encryptionType: value})}
+                    >
                       <SelectTrigger id="encryption-type">
                         <SelectValue placeholder="暗号化方式を選択" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="starttls">STARTTLS（推奨）</SelectItem>
-                        <SelectItem value="ssl">SSL</SelectItem>
-                        <SelectItem value="none">なし</SelectItem>
+                        <SelectItem value="STARTTLS">STARTTLS（推奨）</SelectItem>
+                        <SelectItem value="SSL">SSL</SelectItem>
+                        <SelectItem value="NONE">なし</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   {/* Authentication Username */}
                   <div className="space-y-2 mt-3">
-                    <Label htmlFor="auth-username" className="japanese-text">認証ユーザー名</Label>
-                    <Input type="email" id="auth-username" placeholder="yourname@example.com" />
+                    <Label htmlFor="auth-username" className="japanese-text">認証ユーザー名 <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="email" 
+                      id="auth-username" 
+                      placeholder="ryushigen@toyousoft.co.jp" 
+                      value={smtpSettings.smtpUsername}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, smtpUsername: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       使用するメールアドレス
                     </p>
@@ -296,8 +506,14 @@ export function Email() {
                   
                   {/* Authentication Password */}
                   <div className="space-y-2 mt-3">
-                    <Label htmlFor="auth-password" className="japanese-text">認証パスワード</Label>
-                    <Input type="password" id="auth-password" placeholder="••••••••" />
+                    <Label htmlFor="auth-password" className="japanese-text">認証パスワード <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="password" 
+                      id="auth-password" 
+                      placeholder="••••••••" 
+                      value={smtpSettings.smtpPassword}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, smtpPassword: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       通常のパスワード、またはアプリ用パスワード（Gmailなど）
                     </p>
@@ -306,7 +522,13 @@ export function Email() {
                   {/* Sender Email */}
                   <div className="space-y-2 mt-3">
                     <Label htmlFor="sender-email" className="japanese-text">送信元メール</Label>
-                    <Input type="email" id="sender-email" placeholder="yourname@example.com" />
+                    <Input 
+                      type="email" 
+                      id="sender-email" 
+                      placeholder="ryushigen@toyousoft.co.jp" 
+                      value={smtpSettings.fromEmail}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, fromEmail: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       通常は認証ユーザー名と同じ
                     </p>
@@ -315,10 +537,54 @@ export function Email() {
                   {/* Sender Name */}
                   <div className="space-y-2 mt-3">
                     <Label htmlFor="sender-name" className="japanese-text">送信者名（From）</Label>
-                    <Input id="sender-name" placeholder="AIマッチくん" />
+                    <Input 
+                      id="sender-name" 
+                      placeholder="株式会社トヨウソフト" 
+                      value={smtpSettings.fromName}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, fromName: e.target.value})}
+                    />
                     <p className="text-xs text-muted-foreground japanese-text">
                       受信者に表示される名前
                     </p>
+                  </div>
+                  
+                  {/* Reply-to Email */}
+                  <div className="space-y-2 mt-3">
+                    <Label htmlFor="reply-to-email" className="japanese-text">返信先メール</Label>
+                    <Input 
+                      type="email" 
+                      id="reply-to-email" 
+                      placeholder="ryushigen@toyousoft.co.jp" 
+                      value={smtpSettings.replyToEmail}
+                      onChange={(e) => setSmtpSettings({...smtpSettings, replyToEmail: e.target.value})}
+                    />
+                    <p className="text-xs text-muted-foreground japanese-text">
+                      返信時の宛先（省略可）
+                    </p>
+                  </div>
+                  
+                  {/* Send Limits */}
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="daily-limit" className="japanese-text">1日の送信上限</Label>
+                      <Input 
+                        type="number" 
+                        id="daily-limit" 
+                        placeholder="100" 
+                        value={smtpSettings.dailySendLimit}
+                        onChange={(e) => setSmtpSettings({...smtpSettings, dailySendLimit: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hourly-limit" className="japanese-text">1時間の送信上限</Label>
+                      <Input 
+                        type="number" 
+                        id="hourly-limit" 
+                        placeholder="20" 
+                        value={smtpSettings.hourlySendLimit}
+                        onChange={(e) => setSmtpSettings({...smtpSettings, hourlySendLimit: e.target.value})}
+                      />
+                    </div>
                   </div>
                 </div>
                 
@@ -327,17 +593,45 @@ export function Email() {
                     variant="outline"
                     className="japanese-text flex items-center"
                     onClick={testConnection}
+                    disabled={testingConnection || loading}
                   >
-                    <Wifi className="mr-2 h-4 w-4" />
-                    接続テスト
+                    {testingConnection ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        接続テスト中...
+                      </>
+                    ) : (
+                      <>
+                        <Wifi className="mr-2 h-4 w-4" />
+                        接続テスト
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            </Tabs>
+          );
+        })()}
         
-        <Button className="w-full japanese-text" onClick={handleSave}>設定を保存</Button>
+        <Button 
+          className="w-full japanese-text" 
+          onClick={handleSave}
+          disabled={savingSettings || loading}
+        >
+          {savingSettings ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              保存中...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              設定を保存
+            </>
+          )}
+        </Button>
       </div>
     </MainLayout>
   );

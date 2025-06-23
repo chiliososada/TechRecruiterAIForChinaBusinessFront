@@ -103,11 +103,23 @@ const sidebarItems: SidebarItem[] = [
 ];
 
 export function Sidebar() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, currentTenant } = useAuth();
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({
     '自社': true,
     '他社': true
   });
+
+  // Filter sidebar items based on subscription plan
+  const getFilteredSidebarItems = () => {
+    const subscriptionPlan = currentTenant?.subscription_plan?.toLowerCase();
+    
+    // Hide "メール解析・分析" for basic and free plans
+    if (subscriptionPlan === 'basic' || subscriptionPlan === 'free') {
+      return sidebarItems.filter(item => item.label !== 'メール解析・分析');
+    }
+    
+    return sidebarItems;
+  };
 
   const toggleSubMenu = (label: string) => {
     setExpandedItems(prev => ({
@@ -136,7 +148,7 @@ export function Sidebar() {
         <h1 className="text-2xl font-bold tracking-tight text-custom-blue-700">Tech Recruiter AI</h1>
       </div>
       <div className="flex-1 px-4 space-y-2 overflow-y-auto py-2">
-        {sidebarItems.map((item, i) => (
+        {getFilteredSidebarItems().map((item, i) => (
           <div key={i}>
             {item.subItems ? (
               <div className="space-y-1">

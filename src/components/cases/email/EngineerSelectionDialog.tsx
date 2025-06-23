@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Engineer } from '@/components/cases/email/types'; // Use our local Engineer type
+import { useEngineers } from '@/hooks/useEngineers';
+import { transformDatabaseToUIEngineer } from '@/utils/engineerDataTransform';
 
 interface EngineerSelectionDialogProps {
   isOpen: boolean;
@@ -18,71 +20,34 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
   const [companyTypeFilter, setCompanyTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   
-  // Use the same mock engineers data from Candidates.tsx
-  // In a real app, this would come from an API call or a shared data store
-  const mockEngineers: Engineer[] = [
-    {
-      id: '1',
-      name: '山田太郎',
-      skills: ['JavaScript', 'React', 'Node.js'],
-      japaneseLevel: 'ネイティブレベル',
-      experience: '5年',
-      availability: '即日',
-      status: ['提案中', '事前面談'],
-      remarks: '週4日勤務希望, 出張可, リモート可',
-      companyType: '自社',
-      companyName: 'テックイノベーション株式会社',
-      source: '直接応募',
-      registeredAt: '2023-01-15',
-      updatedAt: '2023-03-20',
-      nationality: '日本',
-      age: '32歳',
-      gender: '男性',
-      nearestStation: '品川駅',
-    },
-    {
-      id: '2',
-      name: '鈴木花子',
-      skills: ['Python', 'Django', 'AWS'],
-      japaneseLevel: 'ネイティブレベル',
-      experience: '3年',
-      availability: '1ヶ月後',
-      status: ['事前面談'],
-      remarks: 'リモート勤務希望, 週5日可',
-      companyType: '他社',
-      companyName: 'フロントエンドパートナーズ株式会社',
-      source: 'エージェント紹介',
-      registeredAt: '2023-02-20',
-      updatedAt: '2023-04-15',
-      nationality: '中国',
-      age: '28歳',
-      gender: '女性',
-      nearestStation: '東京駅',
-    },
-    {
-      id: '3',
-      name: '田中誠',
-      skills: ['Java', 'Spring Boot', 'Oracle'],
-      japaneseLevel: 'ビジネスレベル',
-      experience: '8年',
-      availability: '応相談',
-      status: ['営業終了'],
-      remarks: '大手企業での勤務経験豊富, 長期案件希望',
-      companyType: '自社',
-      companyName: 'テックイノベーション株式会社',
-      source: '直接応募',
-      registeredAt: '2023-03-05',
-      updatedAt: '2023-05-10',
-      nationality: 'インド',
-      age: '35歳',
-      gender: '男性',
-      nearestStation: '新宿駅',
-    }
-  ];
-
-  // Filter engineers based on company type and search query
-  const filteredEngineers = mockEngineers.filter(engineer => {
-    const matchesCompanyType = companyTypeFilter === "all" || engineer.companyType === companyTypeFilter;
+  // Load real engineers data from database - load all types
+  const { engineers: ownEngineers, loading: ownLoading } = useEngineers('own');
+  const { engineers: otherEngineers, loading: otherLoading } = useEngineers('other');
+  
+  // Combine both own and other company engineers
+  const allDbEngineers = [...ownEngineers, ...otherEngineers];
+  
+  // Transform database engineers to UI format
+  const allEngineers = allDbEngineers.map(transformDatabaseToUIEngineer);
+  
+  // Debug logging
+  console.log('=== Engineer Selection Dialog ===');
+  console.log('Own engineers:', ownEngineers.length);
+  console.log('Other engineers:', otherEngineers.length);
+  console.log('Total engineers:', allEngineers.length);
+  console.log('Sample engineer:', allEngineers[0]);
+  
+  // Check if data is still loading
+  const isLoading = ownLoading || otherLoading;
+  
+  // Use only real database data - no mock data fallback
+  const engineersToFilter = allEngineers;
+  const filteredEngineers = engineersToFilter.filter(engineer => {
+    // Map database company_type to UI display values
+    const engineerCompanyType = engineer.companyType === 'own' ? '自社' : 
+                              engineer.companyType === 'other' ? '他社' : 
+                              engineer.companyType;
+    const matchesCompanyType = companyTypeFilter === "all" || engineerCompanyType === companyTypeFilter;
     
     const matchesSearch = !searchQuery || 
       engineer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -94,7 +59,41 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
   });
 
   const handleSelect = (engineer: Engineer) => {
-    onSelect(engineer);
+    // Ensure engineer object matches the expected type
+    const selectedEngineer: Engineer = {
+      id: engineer.id,
+      name: engineer.name,
+      skills: engineer.skills || [],
+      experience: engineer.experience,
+      currentStatus: engineer.currentStatus,
+      company: engineer.company,
+      status: engineer.status,
+      japaneseLevel: engineer.japaneseLevel,
+      availability: engineer.availability,
+      remarks: engineer.remarks,
+      companyType: engineer.companyType,
+      companyName: engineer.companyName,
+      source: engineer.source,
+      recommendation: engineer.recommendation,
+      email: engineer.email,
+      phone: engineer.phone,
+      nationality: engineer.nationality,
+      age: engineer.age,
+      gender: engineer.gender,
+      nearestStation: engineer.nearestStation,
+      education: engineer.education,
+      arrivalYear: engineer.arrivalYear,
+      certifications: engineer.certifications,
+      englishLevel: engineer.englishLevel,
+      technicalKeywords: engineer.technicalKeywords,
+      selfPromotion: engineer.selfPromotion,
+      workScope: engineer.workScope,
+      workExperience: engineer.workExperience,
+      registeredAt: engineer.registeredAt,
+      updatedAt: engineer.updatedAt,
+      isActive: engineer.isActive
+    };
+    onSelect(selectedEngineer);
     onClose();
   };
 
@@ -146,37 +145,51 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEngineers.map((engineer) => (
-                <TableRow key={engineer.id}>
-                  <TableCell className="font-medium japanese-text">{engineer.name}</TableCell>
-                  <TableCell className="japanese-text">
-                    {Array.isArray(engineer.skills) 
-                      ? engineer.skills.join(', ') 
-                      : engineer.skills}
-                  </TableCell>
-                  <TableCell className="japanese-text">{engineer.companyType}</TableCell>
-                  <TableCell className="japanese-text">
-                    {engineer.companyType === '他社' ? engineer.companyName : '-'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => handleSelect(engineer)} 
-                      className="japanese-text"
-                    >
-                      選択
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              
-              {filteredEngineers.length === 0 && (
+              {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4 japanese-text">
-                    検索条件に一致する技術者がいません
+                  <TableCell colSpan={5} className="text-center py-8 japanese-text">
+                    技術者データを読み込み中...
                   </TableCell>
                 </TableRow>
+              ) : filteredEngineers.length === 0 ? (
+                allEngineers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 japanese-text">
+                      技術者データが見つかりません。データベースに技術者情報を登録してください。
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-4 japanese-text">
+                      検索条件に一致する技術者がいません
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : (
+                filteredEngineers.map((engineer) => (
+                  <TableRow key={engineer.id}>
+                    <TableCell className="font-medium japanese-text">{engineer.name}</TableCell>
+                    <TableCell className="japanese-text">
+                      {Array.isArray(engineer.skills) 
+                        ? engineer.skills.join(', ') 
+                        : engineer.skills}
+                    </TableCell>
+                    <TableCell className="japanese-text">{engineer.companyType}</TableCell>
+                    <TableCell className="japanese-text">
+                      {engineer.companyType === '他社' ? engineer.companyName : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => handleSelect(engineer)} 
+                        className="japanese-text"
+                      >
+                        選択
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>

@@ -17,7 +17,8 @@ import {
   Code, 
   FileText, 
   FileCode,
-  MessageSquare
+  MessageSquare,
+  Mail
 } from 'lucide-react';
 import { MailCase } from '../email/types';
 import { getDefaultProcesses } from '../utils/statusUtils';
@@ -73,6 +74,43 @@ export const CaseDetailForm: React.FC<CaseDetailFormProps> = ({
         <Input 
           value={getCurrentValue('title')} 
           onChange={(e) => handleEditChange('title', e.target.value)} 
+          className="border-primary/30 focus:border-primary"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium japanese-text flex items-center">
+          <Briefcase className="h-4 w-4 mr-1 text-gray-600" />
+          会社名
+        </label>
+        <Input 
+          value={getCurrentValue('company')} 
+          onChange={(e) => handleEditChange('company', e.target.value)} 
+          className="border-primary/30 focus:border-primary"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium japanese-text flex items-center">
+          <User className="h-4 w-4 mr-1 text-gray-600" />
+          担当者名
+        </label>
+        <Input 
+          value={getCurrentValue('manager')} 
+          onChange={(e) => handleEditChange('manager', e.target.value)} 
+          className="border-primary/30 focus:border-primary"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium japanese-text flex items-center">
+          <Mail className="h-4 w-4 mr-1 text-gray-600" />
+          担当者メール
+        </label>
+        <Input 
+          type="email"
+          value={getCurrentValue('managerEmail')} 
+          onChange={(e) => handleEditChange('managerEmail', e.target.value)} 
           className="border-primary/30 focus:border-primary"
         />
       </div>

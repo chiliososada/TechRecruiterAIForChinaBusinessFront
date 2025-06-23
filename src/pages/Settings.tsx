@@ -9,8 +9,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Settings() {
+  const { currentTenant } = useAuth();
+  
+  // Check if user has access to general settings based on subscription plan
+  const hasGeneralSettingsAccess = React.useMemo(() => {
+    const subscriptionPlan = currentTenant?.subscription_plan?.toLowerCase();
+    return subscriptionPlan !== 'basic' && subscriptionPlan !== 'free';
+  }, [currentTenant?.subscription_plan]);
+
+  // Determine default tab based on subscription access
+  const defaultTab = hasGeneralSettingsAccess ? "general" : "ai";
+
   return (
     <MainLayout>
       <div className="flex-1 space-y-8 p-8 pt-6">
@@ -18,14 +30,17 @@ export function Settings() {
           <h2 className="text-3xl font-bold tracking-tight japanese-text">設定</h2>
         </div>
 
-        <Tabs defaultValue="general" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="general" className="japanese-text">一般設定</TabsTrigger>
+            {hasGeneralSettingsAccess && (
+              <TabsTrigger value="general" className="japanese-text">一般設定</TabsTrigger>
+            )}
             <TabsTrigger value="ai" className="japanese-text">AI設定</TabsTrigger>
             <TabsTrigger value="templates" className="japanese-text">テンプレート</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="general" className="space-y-6">
+          {hasGeneralSettingsAccess && (
+            <TabsContent value="general" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="japanese-text">アカウント設定</CardTitle>
@@ -62,8 +77,9 @@ export function Settings() {
                 </div>
                 <Button className="w-full japanese-text">設定を保存</Button>
               </CardContent>
-            </Card>
-          </TabsContent>
+              </Card>
+            </TabsContent>
+          )}
           
           <TabsContent value="ai" className="space-y-6">
             <Card>

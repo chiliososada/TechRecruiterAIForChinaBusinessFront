@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { EngineerSelectionDialog } from './email/EngineerSelectionDialog';
 import { processCaseData } from './email/utils/dataProcessing';
 import { MailCase } from './email/types';
+import { sendTestEmail, sendIndividualEmail } from '@/utils/backend-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EmailSenderContainerProps {
   mailCases: MailCase[];  // This receives filtered cases from the parent component
@@ -16,10 +18,14 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   // Use custom hooks
   const emailState = useEmailState(mailCases); 
   const engineerState = useEngineerState(mailCases);
+  const { user } = useAuth();
   
   // State for sorting
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  // Force re-render key to ensure EmailForm shows compose tab when container mounts
+  const [mountKey] = useState(() => `email-container-${Date.now()}`);
   
   // Log the incoming mailCases to debug
   useEffect(() => {
@@ -130,6 +136,11 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   };
   
   const handleSelectCase = (id: string, rowId: string) => {
+    console.log(`=== handleSelectCase called ===`);
+    console.log('Case ID:', id);
+    console.log('Row ID:', rowId);
+    console.log('Current selected cases:', emailState.selectedCases.map(c => ({ id: c.id, rowId: c.selectedRowId })));
+    
     const caseToToggle = paginatedCases.find(c => c.id === id);
     if (!caseToToggle) return;
     
@@ -137,8 +148,9 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       c.id === id && c.selectedRowId === rowId
     );
     
+    console.log('Is already selected:', isAlreadySelected);
+    
     const rowParts = rowId.split('-');
-    const senderEmail = rowParts[1];
     const senderIndex = parseInt(rowParts[2]);
     
     if (isAlreadySelected) {
@@ -172,6 +184,7 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       };
       
       emailState.setSelectedCases([...emailState.selectedCases, updatedCase]);
+      console.log('Added case, new selected cases:', [...emailState.selectedCases, updatedCase].map(c => ({ id: c.id, rowId: c.selectedRowId })));
       toast("送信者を選択しました");
     }
   };
@@ -210,7 +223,7 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
     }, 1500);
   };
   
-  const handleSendEmail = () => {
+  const handleSendEmail = async () => {
     if (emailState.selectedCases.length === 0) {
       toast.error('送信先が選択されていません');
       return;
@@ -220,43 +233,106 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       toast.error('件名または本文が入力されていません');
       return;
     }
-    
-    emailState.setSending(true);
-    
-    // Simulate sending
-    setTimeout(() => {
-      toast.success(`${emailState.selectedCases.length}名にメールを送信しました`);
-      emailState.setSelectedCases([]);
-      emailState.setSelectAll(false);
-      emailState.setSubject('');
-      emailState.setEmailBody('');
-      // Use setSelectedEngineers from engineerState
-      engineerState.setSelectedEngineers([]);
-      emailState.setSending(false);
-    }, 2000);
-  };
-  
-  const handleTestEmail = () => {
-    if (!emailState.subject || !emailState.emailBody) {
-      toast.error('件名または本文が入力されていません');
+
+    if (!user) {
+      toast.error('ユーザー情報が見つかりません。再度ログインしてください。');
       return;
     }
     
     emailState.setSending(true);
     
-    // Simulate sending test email
-    setTimeout(() => {
-      toast.success('テストメールを送信しました');
+    try {
+      // Prepare email list from selected cases
+      const toEmails: string[] = [];
+      const relatedProjectIds: string[] = [];
+      
+      emailState.selectedCases.forEach(caseItem => {
+        if (caseItem.selectedSenderEmail) {
+          toEmails.push(caseItem.selectedSenderEmail);
+          // Add project ID if available
+          if (caseItem.id) {
+            relatedProjectIds.push(caseItem.id);
+          }
+        }
+      });
+
+      if (toEmails.length === 0) {
+        toast.error('有効なメールアドレスが見つかりません');
+        return;
+      }
+
+      // Prepare email content with signature if provided
+      const fullBody = emailState.signature ? `${emailState.emailBody}\n\n${emailState.signature}` : emailState.emailBody;
+
+      const result = await sendIndividualEmail({
+        to_emails: toEmails,
+        subject: emailState.subject,
+        body_text: fullBody,
+        body_html: fullBody.replace(/\n/g, '<br>'), // Simple text to HTML conversion
+        metadata: {
+          case_count: emailState.selectedCases.length,
+          project_ids: relatedProjectIds,
+          engineer_ids: engineerState.selectedEngineers.map(eng => eng.id),
+          sent_from: 'bulk_email_interface'
+        }
+      }, user);
+
+      if (result.success) {
+        toast.success(`${toEmails.length}名にメールを送信しました（キューID: ${result.data?.queue_id}）`);
+        
+        // Clear form after successful send
+        emailState.setSelectedCases([]);
+        emailState.setSelectAll(false);
+        emailState.setSubject('');
+        emailState.setEmailBody('');
+        engineerState.setSelectedEngineers([]);
+      } else {
+        toast.error(result.message || 'メール送信に失敗しました');
+      }
+    } catch (error) {
+      console.error('Email send error:', error);
+      toast.error('メール送信中にエラーが発生しました');
+    } finally {
       emailState.setSending(false);
-    }, 1500);
+    }
   };
   
-  // Handle removing a case from the selected list
-  const handleUnselectCase = (caseId: string, rowId: string) => {
-    emailState.setSelectedCases(prev => 
-      prev.filter(c => !(c.id === caseId && c.selectedRowId === rowId))
-    );
+  const handleTestEmail = async () => {
+    if (!emailState.subject || !emailState.emailBody) {
+      toast.error('件名または本文が入力されていません');
+      return;
+    }
+    
+    // Check if user is available
+    if (!user) {
+      toast.error('ユーザー情報が見つかりません。再度ログインしてください。');
+      return;
+    }
+    
+    emailState.setSending(true);
+    
+    try {
+      // Send test email using the backend API with user info from context
+      const result = await sendTestEmail(
+        emailState.subject,
+        emailState.emailBody,
+        emailState.signature,
+        user // Pass user from auth context
+      );
+      
+      if (result.success) {
+        toast.success('テストメールを送信しました。受信箱をご確認ください。');
+      } else {
+        toast.error(result.message || 'テストメール送信に失敗しました');
+      }
+    } catch (error) {
+      console.error('Test email error:', error);
+      toast.error('テストメール送信中にエラーが発生しました');
+    } finally {
+      emailState.setSending(false);
+    }
   };
+  
   
   // Modified to match the expected signature in EmailSenderContent
   const engineerHandleApply = () => {
@@ -282,6 +358,7 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   return (
     <>
       <EmailSenderContent
+        key={mountKey} // Force re-render when container mounts
         isOtherCompanyMode={true}
         emailState={{
           ...emailState,

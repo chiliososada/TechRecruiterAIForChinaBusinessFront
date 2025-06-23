@@ -47,13 +47,13 @@ export const CasesListHeader: React.FC<CasesListHeaderProps> = ({
             disabled={disabled}
           />
         </TableHead>
-        <TableHead className="japanese-text">送信者</TableHead>
-        <TableHead className="japanese-text">メールアドレス</TableHead>
+        <TableHead className="japanese-text">担当者名</TableHead>
+        <TableHead className="japanese-text">担当者メール</TableHead>
         <TableHead className="japanese-text">案件名</TableHead>
         {showCompanyInfo && (
           <TableHead className="japanese-text">会社名</TableHead>
         )}
-        <TableHead className="japanese-text">キー技術</TableHead>
+        <TableHead className="japanese-text">スキル要件</TableHead>
         <TableHead 
           className="japanese-text cursor-pointer hover:bg-muted/20 transition-colors"
           onClick={() => handleSortClick('startDate')}

@@ -157,6 +157,7 @@ export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
       {/* メール設定部分 - 中央カラム */}
       <div className="lg:col-span-2">
         <EmailForm
+          key="email-form-compose" // Force re-render to ensure compose tab is active
           emailTemplates={EMAIL_TEMPLATES}
           selectedTemplate={emailState.selectedTemplate}
           handleTemplateChange={handleTemplateChange}

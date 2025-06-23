@@ -3,6 +3,7 @@ import React from 'react';
 import { TableRow, TableCell } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Eye, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { MailCase } from '../types';
@@ -37,8 +38,12 @@ export const CasesListRow: React.FC<CasesListRowProps> = ({
   onViewCase,
   index
 }) => {
+  // Debug logging
+  console.log(`Row ${sender.rowId}: isSelected = ${isSelected}`);
+  
   // Handle selection of a specific sender row using rowId
   const handleSelect = () => {
+    console.log(`Clicking checkbox for ${sender.rowId}`);
     handleSelectCase(sender.caseId, sender.rowId);
   };
 
@@ -64,10 +69,11 @@ export const CasesListRow: React.FC<CasesListRowProps> = ({
         <Checkbox 
           checked={isSelected}
           onCheckedChange={handleSelect}
+          aria-label={`Select ${sender.sender}`}
         />
       </TableCell>
       <TableCell className="font-medium japanese-text">
-        {sender.sender || '送信者なし'}
+        {sender.sender || '担当者なし'}
         {sender.position && (
           <span className="ml-1 text-xs text-muted-foreground">({sender.position})</span>
         )}
@@ -79,14 +85,38 @@ export const CasesListRow: React.FC<CasesListRowProps> = ({
       {showCompanyInfo && (
         <TableCell className="japanese-text">{sender.company}</TableCell>
       )}
-      <TableCell className="japanese-text">{sender.keyTechnologies}</TableCell>
       <TableCell className="japanese-text text-sm">
-        {sender.startDate ? (
-          <div className="flex items-center space-x-1">
-            <Calendar className="h-3.5 w-3.5 text-blue-500" />
-            <span>{sender.startDate}</span>
-          </div>
-        ) : '-'}
+        <div className="flex flex-wrap gap-1 max-w-[150px]">
+          {sender.keyTechnologies ? (
+            sender.keyTechnologies.split(',').slice(0, 2).map((skill, idx) => (
+              <Badge key={idx} variant="outline" className="bg-blue-50 text-xs">
+                {skill.trim()}
+              </Badge>
+            ))
+          ) : null}
+          {sender.keyTechnologies && sender.keyTechnologies.split(',').length > 2 && (
+            <Badge variant="outline" className="bg-gray-100 text-xs">
+              +{sender.keyTechnologies.split(',').length - 2}
+            </Badge>
+          )}
+          {!sender.keyTechnologies && '-'}
+        </div>
+      </TableCell>
+      <TableCell className="japanese-text text-sm">
+        {(() => {
+          console.log(`=== DEBUG: Start date for case ${sender.caseId} ===`);
+          console.log('sender.startDate:', sender.startDate);
+          console.log('startDate type:', typeof sender.startDate);
+          console.log('startDate length:', sender.startDate?.length);
+          return sender.startDate ? (
+            <div className="flex items-center space-x-1">
+              <Calendar className="h-3.5 w-3.5 text-blue-500" />
+              <span>{sender.startDate}</span>
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          );
+        })()}
       </TableCell>
       {showCompanyInfo && (
         <TableCell className="japanese-text">

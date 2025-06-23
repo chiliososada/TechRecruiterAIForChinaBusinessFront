@@ -52,11 +52,18 @@ export function EmailForm({
   const [showSignature, setShowSignature] = React.useState(true);
   // State to store draft signature before applying it
   const [draftSignature, setDraftSignature] = React.useState(signature);
+  // State to control which tab is active
+  const [activeTab, setActiveTab] = React.useState("compose");
   
   // Initialize draft signature when component mounts or signature prop changes
   React.useEffect(() => {
     setDraftSignature(signature);
   }, [signature]);
+  
+  // Reset to compose tab when component mounts (when 一括送信 tab is selected)
+  React.useEffect(() => {
+    setActiveTab("compose");
+  }, []);
   
   // Handle signature changes in the textarea
   const handleSignatureChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -87,7 +94,7 @@ export function EmailForm({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs defaultValue="compose" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-2 mb-2">
             <TabsTrigger value="compose" className="japanese-text">メール作成</TabsTrigger>
             <TabsTrigger value="signature" className="japanese-text">署名設定</TabsTrigger>

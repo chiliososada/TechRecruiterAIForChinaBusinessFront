@@ -29,12 +29,16 @@ import {
 } from '@/components/cases/utils/caseUtils';
 import { getCompanyList } from '@/components/cases/data/caseData';
 import { normalizeStatus } from '@/components/cases/utils/statusUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CasesProps {
   companyType?: 'own' | 'other';
 }
 
 export function Cases({ companyType = 'own' }: CasesProps) {
+  // Get auth context for subscription plan checking
+  const { currentTenant } = useAuth();
+  
   // Get projects from Supabase
   const { projects, loading: projectsLoading, fetchProjects } = useProjects();
   const { archives } = useProjectArchives();
@@ -88,6 +92,12 @@ export function Cases({ companyType = 'own' }: CasesProps) {
   // Page title based on company type
   const pageTitle = effectiveCompanyType === 'own' ? '自社案件管理' : '他社案件管理';
   
+  // Check if user has access to email statistics based on subscription plan
+  const hasEmailStatsAccess = React.useMemo(() => {
+    const subscriptionPlan = currentTenant?.subscription_plan?.toLowerCase();
+    return subscriptionPlan !== 'basic' && subscriptionPlan !== 'free';
+  }, [currentTenant?.subscription_plan]);
+  
   // Convert Supabase projects to the format expected by existing components
   // Filter by company_type from database instead of using route logic
   const normalizedCaseData = React.useMemo(() => {
@@ -134,38 +144,54 @@ export function Cases({ companyType = 'own' }: CasesProps) {
     
     console.log('After company_type and is_active filter:', filteredByCompanyType.length);
     
-    const normalized = filteredByCompanyType.map(project => ({
-      id: project.id,
-      title: project.title,
-      company: project.client_company || '',
-      manager: project.manager_name || '',
-      managerEmail: project.manager_email || '',
-      skills: project.skills || [],
-      experience: project.experience || '',
-      location: project.location || '',
-      workType: project.work_type || '',
-      duration: project.duration || '',
-      budget: project.budget || '',
-      desiredBudget: project.desired_budget || '',
-      japanese: project.japanese_level || '',
-      priority: project.priority || '',
-      status: normalizeStatus(project.status || ''),
-      startDate: project.start_date || '',
-      foreignerAccepted: project.foreigner_accepted || false,
-      freelancerAccepted: project.freelancer_accepted || false,
-      interviewCount: project.interview_count || '1',
-      processes: project.processes || [],
-      detailDescription: project.detail_description || '',
-      description: project.description || '',
-      createdAt: project.created_at || '',
-      // Use the actual database company_type field
-      companyType: effectiveCompanyType
-    }));
+    const normalized = filteredByCompanyType.map(project => {
+      console.log(`=== DEBUG: Raw project data for ${project.id} ===`);
+      console.log('start_date field:', project.start_date);
+      console.log('start_date type:', typeof project.start_date);
+      
+      return {
+        id: project.id,
+        title: project.title,
+        company: project.client_company || '',
+        manager: project.manager_name || '',
+        managerEmail: project.manager_email || '',
+        // Add sender fields for bulk email functionality
+        sender: project.manager_name || '',
+        senderName: project.manager_name || '',
+        senderEmail: project.manager_email || '',
+        skills: project.skills || [],
+        experience: project.experience || '',
+        location: project.location || '',
+        workType: project.work_type || '',
+        duration: project.duration || '',
+        budget: project.budget || '',
+        desiredBudget: project.desired_budget || '',
+        japanese: project.japanese_level || '',
+        priority: project.priority || '',
+        status: normalizeStatus(project.status || ''),
+        startDate: project.start_date || '',
+        foreignerAccepted: project.foreigner_accepted || false,
+        freelancerAccepted: project.freelancer_accepted || false,
+        interviewCount: project.interview_count || '1',
+        processes: project.processes || [],
+        detailDescription: project.detail_description || '',
+        description: project.description || '',
+        createdAt: project.created_at || '',
+        // Add registration info for bulk email display
+        registrationType: project.source || '手動',
+        registeredAt: project.created_at || '',
+        // Use the actual database company_type field
+        companyType: effectiveCompanyType
+      };
+    });
     
     console.log('Final normalized case data (first 3):', normalized.slice(0, 3).map(n => ({ 
       id: n.id, 
       title: n.title, 
-      location: n.location 
+      location: n.location,
+      sender: n.sender,
+      senderEmail: n.senderEmail,
+      startDate: n.startDate
     })));
     
     return normalized;
@@ -374,7 +400,9 @@ export function Cases({ companyType = 'own' }: CasesProps) {
               <TabsTrigger contextId={effectiveCompanyType} value="list" className="japanese-text">案件一覧</TabsTrigger>
               <TabsTrigger contextId={effectiveCompanyType} value="upload" className="japanese-text">案件アップロード</TabsTrigger>
               <TabsTrigger contextId={effectiveCompanyType} value="archive" className="japanese-text">案件アーカイブ</TabsTrigger>
-              <TabsTrigger contextId={effectiveCompanyType} value="stats" className="japanese-text">メール案件統計</TabsTrigger>
+              {hasEmailStatsAccess && (
+                <TabsTrigger contextId={effectiveCompanyType} value="stats" className="japanese-text">メール案件統計</TabsTrigger>
+              )}
               <TabsTrigger contextId={effectiveCompanyType} value="send" className="japanese-text">一括送信</TabsTrigger>
             </TabsList>
           )}
@@ -424,7 +452,8 @@ export function Cases({ companyType = 'own' }: CasesProps) {
           {/* Only show the stats and send tabs for other company */}
           {effectiveCompanyType === 'other' && (
             <>
-              <TabsContent contextId={effectiveCompanyType} value="stats" className="space-y-6">
+              {hasEmailStatsAccess && (
+                <TabsContent contextId={effectiveCompanyType} value="stats" className="space-y-6">
                 <EmailStatsTab 
                   filteredMailCases={filteredMailCases}
                   paginatedMailCases={getPaginatedData(filteredMailCases, currentPage, itemsPerPage)}
@@ -443,7 +472,8 @@ export function Cases({ companyType = 'own' }: CasesProps) {
                   emailStats={emailStats}
                   companyList={companyList}
                 />
-              </TabsContent>
+                </TabsContent>
+              )}
 
               <TabsContent contextId={effectiveCompanyType} value="send" className="space-y-6">
                 <EmailSenderContainer 
