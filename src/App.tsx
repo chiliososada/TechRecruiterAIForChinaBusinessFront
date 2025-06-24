@@ -19,6 +19,8 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ToastProvider } from "@/hooks/toast/toast-provider";
 import { DebugPanel } from "@/components/layout/DebugPanel"; // 添加这一行
 import AuthDebug from "./pages/AuthDebug";
+import TestPage from "./pages/TestPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,19 +31,22 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ToastProvider>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
 
               {/* Protected routes */}
-              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/test" element={<TestPage />} />
+              <Route path="/protected" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
               {/* Own company routes */}
               <Route path="/cases/company/own" element={<ProtectedRoute><Cases companyType="own" /></ProtectedRoute>} />
@@ -74,6 +79,7 @@ const App = () => (
       </TooltipProvider>
     </ToastProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

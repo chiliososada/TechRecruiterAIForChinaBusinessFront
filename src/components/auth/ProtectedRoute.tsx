@@ -89,7 +89,7 @@ export function ProtectedRoute({
 export function DevAuthInfo() {
   const { user, token, loading } = useAuth();
 
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return null;
   }
 

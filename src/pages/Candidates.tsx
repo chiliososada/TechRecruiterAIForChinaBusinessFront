@@ -40,12 +40,13 @@ const initialCandidateData: NewEngineerType = {
   companyType: '自社',
   companyName: '',
   source: '',
-  technicalKeywords: '',
   selfPromotion: '',
   workScope: '',
   workExperience: '',
   email: '',      // Added email field
   phone: '',      // Added phone field
+  managerName: '', // Added manager name field
+  managerEmail: '', // Added manager email field
   registeredAt: '',
   updatedAt: '',
 };
@@ -221,7 +222,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   return (
     <MainLayout>
-      <div className="flex-1 space-y-8 p-8 pt-6">
+      <div className="flex-1 space-y-8">
         <h1 className="text-3xl font-bold mb-6 japanese-text">{pageTitle}</h1>
         
         <TabsWithContext defaultValue="list" className="w-full" contextId={tabContextId}>

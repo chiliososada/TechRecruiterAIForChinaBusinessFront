@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, Wand2, User, GraduationCap, Globe, Code, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { NewEngineerType } from './types';
 
@@ -38,6 +39,34 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<NewEngineerType>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user, currentTenant } = useAuth();
+
+  // 自社エンジニアの場合、担当者情報を自動入力
+  useEffect(() => {
+    console.log('=== CandidateFormStyled useEffect Debug ===', {
+      isOwnCompany,
+      user: user ? { full_name: user.full_name, email: user.email } : null,
+      currentTenant: currentTenant ? { name: currentTenant.name, company_name: currentTenant.company_name } : null
+    });
+    
+    if (isOwnCompany && user && currentTenant) {
+      console.log('=== Auto-filling manager fields in CandidateFormStyled ===', {
+        user: user,
+        tenant: currentTenant,
+        managerName: user.full_name || user.email || '',
+        managerEmail: user.email || '',
+        companyName: currentTenant.name || currentTenant.company_name || ''
+      });
+      const updatedData = {
+        ...formData,
+        managerName: user.full_name || user.email || '',
+        managerEmail: user.email || '',
+        companyName: currentTenant.name || currentTenant.company_name || ''
+      };
+      setFormData(updatedData);
+      onDataChange(updatedData);
+    }
+  }, [isOwnCompany, user, currentTenant]);
 
   const handleChange = (field: keyof NewEngineerType, value: string) => {
     const updatedData = { ...formData, [field]: value };
@@ -66,8 +95,16 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
       missingFields.push('経験年数');
     }
 
-    if (!isOwnCompany && (!formData.companyName || formData.companyName.trim() === '')) {
+    if (!formData.companyName || formData.companyName.trim() === '') {
       missingFields.push('所属会社');
+    }
+
+    if (!isOwnCompany && (!formData.managerName || formData.managerName.trim() === '')) {
+      missingFields.push('担当者名');
+    }
+
+    if (!isOwnCompany && (!formData.managerEmail || formData.managerEmail.trim() === '')) {
+      missingFields.push('担当者メール');
     }
 
     if (missingFields.length > 0) {
@@ -141,21 +178,56 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
                   />
                 </div>
                 
-                {!isOwnCompany && (
+                <div className="space-y-3">
+                  <Label htmlFor="companyName" className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                    所属会社 <span className="text-red-500">*</span>
+                    {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                  </Label>
+                  <Input 
+                    id="companyName" 
+                    value={formData.companyName}
+                    onChange={(e) => handleChange('companyName', e.target.value)}
+                    placeholder={isOwnCompany ? "自動入力されます" : "例: テックイノベーション株式会社"}
+                    className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                    disabled={isOwnCompany}
+                    required
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <Label htmlFor="companyName" className="japanese-text font-medium text-gray-700 flex items-center gap-1">
-                      所属会社 <span className="text-red-500">*</span>
+                    <Label htmlFor="managerName" className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                      担当者名 <span className="text-red-500">*</span>
+                      {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
                     </Label>
                     <Input 
-                      id="companyName" 
-                      value={formData.companyName}
-                      onChange={(e) => handleChange('companyName', e.target.value)}
-                      placeholder="例: テックイノベーション株式会社"
-                      className="japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                      required
+                      id="managerName" 
+                      value={formData.managerName}
+                      onChange={(e) => handleChange('managerName', e.target.value)}
+                      placeholder={isOwnCompany ? "自動入力されます" : "例: 田中 太郎"}
+                      className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                      disabled={isOwnCompany}
+                      required={!isOwnCompany}
                     />
                   </div>
-                )}
+                  
+                  <div className="space-y-3">
+                    <Label htmlFor="managerEmail" className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                      担当者メール <span className="text-red-500">*</span>
+                      {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                    </Label>
+                    <Input 
+                      type="email"
+                      id="managerEmail" 
+                      value={formData.managerEmail}
+                      onChange={(e) => handleChange('managerEmail', e.target.value)}
+                      placeholder={isOwnCompany ? "自動入力されます" : "例: tanaka@company.co.jp"}
+                      className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                      disabled={isOwnCompany}
+                      required={!isOwnCompany}
+                    />
+                  </div>
+                </div>
                 
                 <div className="space-y-3">
                   <Label className="japanese-text font-medium text-gray-700">国籍</Label>

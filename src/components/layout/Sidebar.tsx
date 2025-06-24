@@ -16,7 +16,9 @@ import {
   Building2,
   User,
   LogOut,
-  ChevronUp
+  ChevronUp,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -102,7 +104,12 @@ const sidebarItems: SidebarItem[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const { user, profile, signOut, currentTenant } = useAuth();
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({
     '自社': true,
@@ -143,27 +150,48 @@ export function Sidebar() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-sidebar border-r border-sidebar-border">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold tracking-tight text-custom-blue-700">Tech Recruiter AI</h1>
+    <div className="h-screen flex flex-col bg-sidebar border-r border-sidebar-border relative">
+      <div className={cn("p-6 flex items-center justify-between", isCollapsed && "p-3")}>
+        {!isCollapsed && (
+          <h1 className="text-2xl font-bold tracking-tight text-custom-blue-700">Tech Recruiter AI</h1>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-8 w-8 p-0 absolute right-2 top-4",
+            isCollapsed && "relative right-auto top-auto"
+          )}
+          onClick={onToggleCollapse}
+        >
+          {isCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
+        </Button>
       </div>
-      <div className="flex-1 px-4 space-y-2 overflow-y-auto py-2">
+      <div className={cn("flex-1 px-4 space-y-2 overflow-y-auto py-2", isCollapsed && "px-2")}>
         {getFilteredSidebarItems().map((item, i) => (
           <div key={i}>
             {item.subItems ? (
               <div className="space-y-1">
                 <div 
-                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all text-sidebar-foreground cursor-pointer"
-                  onClick={() => toggleSubMenu(item.label)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all text-sidebar-foreground cursor-pointer",
+                    isCollapsed && "px-2 justify-center"
+                  )}
+                  onClick={() => !isCollapsed && toggleSubMenu(item.label)}
+                  title={isCollapsed ? item.label : undefined}
                 >
                   {item.icon}
-                  <span className="japanese-text flex-1">{item.label}</span>
-                  <span className="text-xs">
-                    {expandedItems[item.label] ? '▼' : '▶'}
-                  </span>
+                  {!isCollapsed && (
+                    <>
+                      <span className="japanese-text flex-1">{item.label}</span>
+                      <span className="text-xs">
+                        {expandedItems[item.label] ? '▼' : '▶'}
+                      </span>
+                    </>
+                  )}
                 </div>
                 
-                {expandedItems[item.label] && (
+                {expandedItems[item.label] && !isCollapsed && (
                   <div className="pl-6 space-y-1 mt-1">
                     {item.subItems.map((subItem, j) => (
                       <NavLink
@@ -193,23 +221,25 @@ export function Sidebar() {
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
                     isActive
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                    isCollapsed && 'px-2 justify-center'
                   )
                 }
+                title={isCollapsed ? item.label : undefined}
               >
                 {item.icon}
-                <span className="japanese-text">{item.label}</span>
+                {!isCollapsed && <span className="japanese-text">{item.label}</span>}
               </NavLink>
             )}
           </div>
         ))}
       </div>
-      <div className="p-4 border-t border-sidebar-border">
+      <div className={cn("p-4 border-t border-sidebar-border", isCollapsed && "p-2")}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full h-auto p-2 justify-start">
-              <div className="flex items-center gap-3 w-full">
-                <Avatar className="h-8 w-8">
+            <Button variant="ghost" className={cn("w-full h-auto p-2 justify-start", isCollapsed && "p-0 justify-center")}>
+              <div className={cn("flex items-center gap-3 w-full", isCollapsed && "justify-center")}>
+                <Avatar className={cn("h-8 w-8", isCollapsed && "h-9 w-9")}>
                   {profile?.avatar_url ? (
                     <AvatarImage src={profile.avatar_url} />
                   ) : null}
@@ -217,15 +247,19 @@ export function Sidebar() {
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">
-                    {getDisplayName()}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user?.email}
-                  </p>
-                </div>
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                {!isCollapsed && (
+                  <>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-medium text-sidebar-foreground truncate">
+                        {getDisplayName()}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user?.email}
+                      </p>
+                    </div>
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  </>
+                )}
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -233,13 +267,13 @@ export function Sidebar() {
             <NavLink to="/profile">
               <DropdownMenuItem className="cursor-pointer">
                 <User className="h-4 w-4 mr-2" />
-                <span className="japanese-text">个人资料</span>
+                <span className="japanese-text">プロフィール</span>
               </DropdownMenuItem>
             </NavLink>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer" onClick={signOut}>
               <LogOut className="h-4 w-4 mr-2" />
-              <span className="japanese-text">退出登录</span>
+              <span className="japanese-text">ログアウト</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

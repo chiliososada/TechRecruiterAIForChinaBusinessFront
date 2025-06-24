@@ -5,7 +5,7 @@ import { MailCase } from '../email/types';
 // 案件のサンプルデータ（案件詳細を追加）
 export const caseData: MailCase[] = [
   {
-    id: "1",
+    id: "c744bb81-c4f5-4550-bdc3-5dd217e81f68",
     title: "Java開発エンジニア",
     skills: ["Java", "Spring Boot", "SQL"],
     location: "東京（リモート可）",
@@ -82,7 +82,7 @@ export const caseData: MailCase[] = [
     description: "金融系システムの新規開発プロジェクトにおけるJavaエンジニアの募集案件です。既存システムのリプレイス案件となります。"
   },
   {
-    id: "2",
+    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     title: "フロントエンドエンジニア",
     skills: ["React", "TypeScript", "Next.js"],
     location: "大阪",
@@ -152,7 +152,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     description: "ECサイトのフロントエンド開発を担当するエンジニアを募集しています。主にReactとTypeScriptを使用した開発となります。"
   },
   {
-    id: "3",
+    id: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
     title: "インフラエンジニア",
     skills: ["AWS", "Docker", "Kubernetes"],
     location: "名古屋",
@@ -221,7 +221,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     description: "クラウドインフラの設計・構築・運用を担当するエンジニアを募集しています。AWSとKubernetesを中心とした環境です。"
   },
   {
-    id: "4",
+    id: "d4e5f6a7-b8c9-0123-cdef-456789abcdef",
     title: "データサイエンティスト",
     skills: ["Python", "機械学習", "統計解析"],
     location: "東京（フルリモート可）",
@@ -285,7 +285,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     description: "機械学習モデルの研究開発を行うデータサイエンティストを募集しています。大規模データ分析と機械学習モデル開発が主な業務です。"
   },
   {
-    id: "5",
+    id: "e5f6a7b8-c9d0-1234-def0-56789abcdef1",
     title: "セキュリティエンジニア",
     skills: ["情報セキュリティ", "脆弱性診断", "ペネトレーションテスト"],
     location: "大阪",
@@ -348,7 +348,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     description: "情報セキュリティ対策を担当するセキュリティエンジニアを募集しています。脆弱性診断・ペネトレーションテストが主な業務です。"
   },
   {
-    id: "6",
+    id: "f6a7b8c9-d0e1-2345-ef01-6789abcdef12",
     title: "AWSクラウドアーキテクト",
     skills: ["AWS", "クラウドアーキテクチャ", "サーバーレス"],
     location: "東京",
@@ -417,7 +417,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     description: "大規模基幹システムのクラウド移行を担当するAWSクラウドアーキテクトを募集しています。オンプレミスからAWSへの移行が主な業務です。"
   },
   {
-    id: "7",
+    id: "a7b8c9d0-e1f2-3456-f012-789abcdef123",
     title: "フルスタックエンジニア",
     skills: ["React", "Node.js", "MongoDB"],
     location: "福岡（リモート可）",
@@ -481,7 +481,7 @@ Webアプリケーションの開発を担当するフルスタックエンジ�
     description: "Webアプリケーションの開発を担当するフルスタックエンジニアを募集しています。ReactとNode.jsを使った開発が中心です。"
   },
   {
-    id: "8",
+    id: "b8c9d0e1-f2a3-4567-0123-89abcdef1234",
     title: "DevOpsエンジニア",
     skills: ["Jenkins", "AWS", "Terraform", "Ansible"],
     location: "東京（週3リモート可）",
@@ -545,7 +545,7 @@ CI/CD環境の構築・運用を担当するDevOpsエンジニアを募集して
     description: "CI/CD環境の構築・運用を担当するDevOpsエンジニアを募集しています。インフラ自動化とCI/CDパイプラインの整備が主な業務です。"
   },
   {
-    id: "9",
+    id: "c9d0e1f2-a3b4-5678-1234-9abcdef12345",
     title: "iOS/Androidアプリ開発者",
     skills: ["Swift", "Kotlin", "Flutter"],
     location: "大阪（フルリモート可）",
@@ -614,7 +614,7 @@ iOS/Androidアプリ開発を担当するモバイルアプリ開発者を募集
     description: "iOS/Androidアプリ開発を担当するモバイルアプリ開発者を募集しています。SwiftやKotlin、Flutterを使用した開発が主な業務です。"
   },
   {
-    id: "10",
+    id: "d0e1f2a3-b4c5-6789-2345-abcdef123456",
     title: "UI/UXデザイナー",
     skills: ["Figma", "Adobe XD", "Sketch"],
     location: "東京（週2リモート可）",

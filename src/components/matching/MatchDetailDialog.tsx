@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { EnhancedMatchingResult, CaseDetailItem, CandidateItem } from './types';
 
 interface MatchDetailDialogProps {
@@ -20,7 +19,6 @@ interface MatchDetailDialogProps {
   matchData: EnhancedMatchingResult | null;
   caseData?: CaseDetailItem;
   candidateData?: CandidateItem;
-  onMemoSave?: (id: number | string, memo: string) => void;
 }
 
 export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
@@ -28,20 +26,11 @@ export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
   onClose,
   matchData,
   caseData,
-  candidateData,
-  onMemoSave
+  candidateData
 }) => {
-  const [memo, setMemo] = useState(matchData?.memo || '');
   const [activeTab, setActiveTab] = useState('match');
 
   if (!matchData) return null;
-
-  const handleSaveMemo = () => {
-    if (onMemoSave) {
-      onMemoSave(matchData.id, memo);
-    }
-    // Close dialog or show success message
-  };
 
   // Helper function to render skills appropriately based on type
   const renderSkills = (skills: string | string[] | undefined) => {
@@ -103,6 +92,26 @@ export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
                 <p className="text-sm font-medium japanese-text">案件会社</p>
                 <p className="japanese-text">{matchData.caseCompany || '未設定'}</p>
               </div>
+
+              <div>
+                <p className="text-sm font-medium japanese-text">案件担当者</p>
+                <div className="japanese-text">
+                  <p className="font-medium">{matchData.caseManager || '未設定'}</p>
+                  {matchData.caseManagerEmail && (
+                    <p className="text-sm text-blue-600 mt-1">{matchData.caseManagerEmail}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium japanese-text">所属担当者</p>
+                <div className="japanese-text">
+                  <p className="font-medium">{matchData.affiliationManager || '未設定'}</p>
+                  {matchData.affiliationManagerEmail && (
+                    <p className="text-sm text-blue-600 mt-1">{matchData.affiliationManagerEmail}</p>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div>
@@ -117,22 +126,6 @@ export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
               </div>
             )}
             
-            <div>
-              <p className="text-sm font-medium japanese-text">メモ</p>
-              <Textarea 
-                value={memo} 
-                onChange={(e) => setMemo(e.target.value)}
-                placeholder="メモを入力してください"
-                className="japanese-text"
-              />
-              <Button 
-                onClick={handleSaveMemo}
-                className="mt-2 japanese-text"
-                size="sm"
-              >
-                メモを保存
-              </Button>
-            </div>
           </TabsContent>
           
           {/* Case details tab */}
@@ -144,9 +137,20 @@ export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
                     <p className="text-sm font-medium japanese-text">案件名</p>
                     <p className="japanese-text">{caseData.title}</p>
                   </div>
+                  
                   <div>
-                    <p className="text-sm font-medium japanese-text">クライアント</p>
-                    <p className="japanese-text">{caseData.client}</p>
+                    <p className="text-sm font-medium japanese-text">案件担当者</p>
+                    <div className="japanese-text">
+                      <p className="font-medium">{matchData.caseManager || '未設定'}</p>
+                      {matchData.caseManagerEmail && (
+                        <p className="text-sm text-blue-600 mt-1">{matchData.caseManagerEmail}</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium japanese-text">案件会社</p>
+                    <p className="japanese-text">{matchData.caseCompany || '未設定'}</p>
                   </div>
                 </div>
                 
@@ -185,9 +189,20 @@ export const MatchDetailDialog: React.FC<MatchDetailDialogProps> = ({
                     <p className="text-sm font-medium japanese-text">名前</p>
                     <p className="japanese-text">{candidateData.name}</p>
                   </div>
+                  
                   <div>
-                    <p className="text-sm font-medium japanese-text">所属</p>
-                    <p className="japanese-text">{candidateData.companyType || '未設定'}</p>
+                    <p className="text-sm font-medium japanese-text">候補者所属</p>
+                    <p className="japanese-text">{matchData.candidateCompany || '未設定'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium japanese-text">所属担当者</p>
+                    <div className="japanese-text">
+                      <p className="font-medium">{matchData.affiliationManager || '未設定'}</p>
+                      {matchData.affiliationManagerEmail && (
+                        <p className="text-sm text-blue-600 mt-1">{matchData.affiliationManagerEmail}</p>
+                      )}
+                    </div>
                   </div>
                   
                   <div>

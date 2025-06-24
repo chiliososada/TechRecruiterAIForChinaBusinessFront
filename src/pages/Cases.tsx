@@ -368,7 +368,7 @@ export function Cases({ companyType = 'own' }: CasesProps) {
   if (projectsLoading) {
     return (
       <MainLayout>
-        <div className="flex-1 space-y-8 p-8 pt-6">
+        <div className="flex-1 space-y-8">
           <div className="text-center">案件データを読み込んでいます...</div>
         </div>
       </MainLayout>
@@ -383,7 +383,7 @@ export function Cases({ companyType = 'own' }: CasesProps) {
 
   return (
     <MainLayout>
-      <div className="flex-1 space-y-8 p-8 pt-6">
+      <div className="flex-1 space-y-8">
         <CasesHeader pageTitle={pageTitle} />
 
         <TabsWithContext defaultValue="list" contextId={effectiveCompanyType} className="space-y-6">

@@ -29,6 +29,8 @@ export interface DatabaseEngineer {
   certifications: string[] | null;
   email: string | null;
   phone: string | null;
+  manager_name: string | null;
+  manager_email: string | null;
   created_at: string;
   updated_at: string;
   tenant_id: string;
@@ -113,7 +115,7 @@ export const useEngineers = (companyType: 'own' | 'other') => {
       });
 
       console.log('Successfully fetched engineers:', data?.length || 0);
-      setEngineers(data || []);
+      setEngineers((data as DatabaseEngineer[]) || []);
     } catch (error: any) {
       console.error('Error fetching engineers:', error);
       const errorMessage = error.message || 'データの取得に失敗しました';
@@ -146,6 +148,10 @@ export const useEngineers = (companyType: 'own' | 'other') => {
 
     try {
       console.log('Creating engineer with data:', engineerData);
+      console.log('Manager fields in createEngineer:', {
+        manager_name: engineerData.manager_name,
+        manager_email: engineerData.manager_email
+      });
 
 
       // 使用已经转换好的数据，只添加必要的系统字段
@@ -160,6 +166,10 @@ export const useEngineers = (companyType: 'own' | 'other') => {
       };
 
       console.log('Processed engineer data for insert:', newEngineer);
+      console.log('Final manager fields before DB insert:', {
+        manager_name: newEngineer.manager_name,
+        manager_email: newEngineer.manager_email
+      });
 
       const result = await businessClientManager.executeWithRetry(async () => {
         const client = businessClientManager.getClient();
@@ -241,6 +251,8 @@ export const useEngineers = (companyType: 'own' | 'other') => {
         certifications: ensureArray(engineerData.certifications),
         email: engineerData.email === '' ? null : engineerData.email,
         phone: engineerData.phone === '' ? null : engineerData.phone,
+        manager_name: engineerData.manager_name === '' ? null : engineerData.manager_name,
+        manager_email: engineerData.manager_email === '' ? null : engineerData.manager_email,
         updated_at: new Date().toISOString()
       };
 

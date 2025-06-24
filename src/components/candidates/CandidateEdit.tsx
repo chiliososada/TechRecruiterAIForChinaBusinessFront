@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Save, Wand2 } from 'lucide-react';
 import { Engineer } from './types';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CandidateEditProps {
   open: boolean;
@@ -33,10 +34,24 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
 チームリーダーとしての経験もあり、要件定義から設計、実装、テストまでの一連の開発プロセスを担当できます。
 [備考]`
   );
+  const { user, currentTenant } = useAuth();
 
   useEffect(() => {
     setLocalEngineer(engineer);
   }, [engineer]);
+
+  // 自社エンジニアの場合、担当者情報を自動入力
+  useEffect(() => {
+    if (localEngineer && isOwnCompany && user && currentTenant) {
+      const updatedEngineer = {
+        ...localEngineer,
+        managerName: user.full_name || user.email || '',
+        managerEmail: user.email || '',
+        companyName: currentTenant.name || currentTenant.company_name || ''
+      };
+      setLocalEngineer(updatedEngineer);
+    }
+  }, [isOwnCompany, user, currentTenant, localEngineer?.id]);
 
   if (!localEngineer) return null;
 
@@ -99,16 +114,50 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
               />
             </div>
 
-            {!isOwnCompany && (
+            <div className="space-y-2">
+              <Label className="japanese-text">
+                所属会社 <span className="text-red-500">*</span>
+                {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+              </Label>
+              <Input 
+                value={localEngineer.companyName || ''}
+                onChange={(e) => handleChange('companyName', e.target.value)}
+                placeholder={isOwnCompany ? "自動入力されます" : "例: テックイノベーション株式会社"}
+                className={`japanese-text ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                disabled={isOwnCompany}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="japanese-text">所属会社 <span className="text-red-500">*</span></Label>
+                <Label className="japanese-text">
+                  担当者名 <span className="text-red-500">*</span>
+                  {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                </Label>
                 <Input 
-                  value={localEngineer.companyName || ''}
-                  onChange={(e) => handleChange('companyName', e.target.value)}
-                  className="japanese-text"
+                  value={localEngineer.managerName || ''}
+                  onChange={(e) => handleChange('managerName', e.target.value)}
+                  placeholder={isOwnCompany ? "自動入力されます" : "例: 田中 太郎"}
+                  className={`japanese-text ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                  disabled={isOwnCompany}
                 />
               </div>
-            )}
+              
+              <div className="space-y-2">
+                <Label className="japanese-text">
+                  担当者メール <span className="text-red-500">*</span>
+                  {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                </Label>
+                <Input 
+                  type="email"
+                  value={localEngineer.managerEmail || ''}
+                  onChange={(e) => handleChange('managerEmail', e.target.value)}
+                  placeholder={isOwnCompany ? "自動入力されます" : "例: tanaka@company.co.jp"}
+                  className={`japanese-text ${isOwnCompany ? 'bg-gray-100' : ''}`}
+                  disabled={isOwnCompany}
+                />
+              </div>
+            </div>
             
             <div className="space-y-2">
               <Label className="japanese-text">国籍</Label>
@@ -191,16 +240,6 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
                 onChange={(e) => handleSkillsChange(e.target.value)}
                 className="japanese-text"
                 placeholder="例: Java, Spring Boot, AWS（カンマ区切り）"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">技術キーワード</Label>
-              <Input 
-                value={Array.isArray(localEngineer.technicalKeywords) ? localEngineer.technicalKeywords.join(', ') : localEngineer.technicalKeywords || ''}
-                onChange={(e) => handleChange('technicalKeywords', e.target.value.split(',').map(kw => kw.trim()))}
-                className="japanese-text"
-                placeholder="例: クラウド, マイクロサービス, CI/CD"
               />
             </div>
             

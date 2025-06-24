@@ -12,7 +12,7 @@ export const DebugPanel: React.FC = () => {
     const { user, currentTenant } = useAuth();
 
     // 開発環境以外では何も表示しない
-    if (process.env.NODE_ENV !== 'development') {
+    if (!import.meta.env.DEV) {
         return null;
     }
 

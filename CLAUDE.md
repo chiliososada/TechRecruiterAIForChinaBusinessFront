@@ -336,7 +336,30 @@ CREATE TABLE public.user_ai_configurations (
   deleted_at timestamptz,
   PRIMARY KEY (id)
 );
-
+CREATE TABLE public.ai_matching_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL,
+  matching_type text DEFAULT 'auto',
+  execution_status text DEFAULT 'pending',
+  trigger_type text,
+  executed_by uuid,
+  started_at timestamptz DEFAULT now(),
+  completed_at timestamptz,
+  processing_time_seconds integer,
+  project_ids uuid[] DEFAULT '{}',
+  engineer_ids uuid[] DEFAULT '{}',
+  total_projects_input integer DEFAULT 0,
+  total_engineers_input integer DEFAULT 0,
+  total_matches_generated integer DEFAULT 0,
+  high_quality_matches integer DEFAULT 0,
+  ai_config jsonb DEFAULT '{}',
+  ai_model_version text,
+  filters jsonb DEFAULT '{}',
+  statistics jsonb DEFAULT '{}',
+  error_message text
+);
+-- 创建索引以提高查询性能
+CREATE INDEX idx_ai_matching_history_tenant_id ON public.ai_matching_history(tenant_id);
 -- 创建索引
 CREATE INDEX idx_projects_tenant_id ON public.projects(tenant_id);
 CREATE INDEX idx_projects_status ON public.projects(status);
@@ -347,5 +370,272 @@ CREATE INDEX idx_engineers_current_status ON public.engineers(current_status);
 CREATE INDEX idx_project_engineer_matches_project_id ON public.project_engineer_matches(project_id);
 CREATE INDEX idx_project_engineer_matches_engineer_id ON public.project_engineer_matches(engineer_id);
 CREATE INDEX idx_project_engineer_matches_tenant_id ON public.project_engineer_matches(tenant_id);
+人才和案件匹配API总结
+根据查找到的信息，这里是您项目中人才（简历/工程师）和案件（项目）相关匹配的所有API详细信息：
+1. 案件匹配简历 API
+路径: /api/v1/ai-matching/project-to-engineers
+方法: POST
+描述: 为特定案件找到最合适的简历候选人
+Request Body:
+python{
+    "tenant_id": "uuid",                    # 租户ID（必填）
+    "project_id": "uuid",                   # 案件ID（必填）
+    "executed_by": "uuid",                  # 执行人ID（可选）
+    "matching_type": "string",              # 匹配类型，默认"auto"
+    "trigger_type": "string",               # 触发类型，默认"api"
+    "max_matches": 10,                      # 最大匹配数量（1-100），默认10
+    "min_score": 0.6,                       # 最小匹配分数（0-1），默认0.6
+    "weights": {                            # 匹配权重配置（可选）
+        "skill_match": 0.3,                 # 技能匹配权重
+        "experience_match": 0.25,           # 经验匹配权重
+        "project_experience_match": 0.2,    # 项目经验匹配权重
+        "japanese_level_match": 0.15,       # 日语水平匹配权重
+        "location_match": 0.1               # 地点匹配权重
+    },
+    "filters": {                            # 筛选条件（可选）
+        "japanese_level": ["N1", "N2"],     # 日语等级筛选
+        "current_status": ["available"]     # 状态筛选
+    }
+}
+Response (ProjectToEngineersResponse):
+python{
+    "matching_history": {                   # 匹配历史信息
+        "id": "uuid",
+        "tenant_id": "uuid",
+        "executed_by": "uuid",
+        "matching_type": "string",
+        "trigger_type": "string",
+        "execution_status": "string",
+        "started_at": "datetime",
+        "completed_at": "datetime",
+        "total_projects_input": 1,
+        "total_engineers_input": 100,
+        "total_matches_generated": 10,
+        "high_quality_matches": 5,
+        "processing_time_seconds": 2,
+        "project_ids": ["uuid"],
+        "engineer_ids": ["uuid", ...],
+        "ai_config": {...},
+        "ai_model_version": "pgvector_database_similarity",
+        "statistics": {...},
+        "filters": {...},
+        "error_message": null
+    },
+    "project_info": {                       # 项目信息
+        "id": "uuid",
+        "title": "项目名称",
+        "skills": ["Java", "Spring"],
+        ...
+    },
+    "matched_engineers": [                  # 匹配的工程师列表
+        {
+            "id": "uuid",
+            "project_id": "uuid",
+            "engineer_id": "uuid",
+            "match_score": 0.85,            # 总匹配分数
+            "confidence_score": 0.80,       # 置信度分数
+            "skill_match_score": 0.90,     # 技能匹配分数
+            "experience_match_score": 0.85,
+            "project_experience_match_score": 0.80,
+            "japanese_level_match_score": 0.75,
+            "budget_match_score": 0.70,
+            "location_match_score": 0.85,
+            "matched_skills": ["Java", "Spring"],
+            "missing_skills": ["Docker"],
+            "matched_experiences": ["Web开发"],
+            "missing_experiences": ["云架构"],
+            "project_experience_match": ["电商系统"],
+            "missing_project_experience": [],
+            "match_reasons": ["技能高度匹配", "经验丰富"],
+            "concerns": ["缺少Docker经验"],
+            "project_title": "项目名称",
+            "engineer_name": "工程师姓名",
+            "status": "未保存",
+            "created_at": "datetime"
+        },
+        ...
+    ],
+    "total_matches": 10,                    # 总匹配数
+    "high_quality_matches": 5,              # 高质量匹配数
+    "processing_time_seconds": 2.5,         # 处理时间
+    "recommendations": ["建议1", "建议2"],  # 推荐建议
+    "warnings": []                          # 警告信息
+}
+
+2. 简历匹配案件 API
+路径: /api/v1/ai-matching/engineer-to-projects
+方法: POST
+描述: 为特定简历推荐最合适的案件机会
+Request Body:
+python{
+    "tenant_id": "uuid",                    # 租户ID（必填）
+    "engineer_id": "uuid",                  # 工程师ID（必填）
+    "executed_by": "uuid",                  # 执行人ID（可选）
+    "matching_type": "string",              # 匹配类型，默认"auto"
+    "trigger_type": "string",               # 触发类型，默认"api"
+    "max_matches": 10,                      # 最大匹配数量（1-100），默认10
+    "min_score": 0.6,                       # 最小匹配分数（0-1），默认0.6
+    "weights": {                            # 匹配权重配置（可选）
+        "skill_match": 0.35,                # 技能匹配权重
+        "experience_match": 0.3,            # 经验匹配权重
+        "budget_match": 0.2,                # 预算匹配权重
+        "location_match": 0.15              # 地点匹配权重
+    },
+    "filters": {                            # 筛选条件（可选）
+        "status": ["募集中"],               # 案件状态筛选
+        "company_type": ["自社"]            # 公司类型筛选
+    }
+}
+Response (EngineerToProjectsResponse):
+python{
+    "matching_history": {...},              # 同上结构
+    "engineer_info": {                      # 工程师信息
+        "id": "uuid",
+        "name": "工程师姓名",
+        "skills": ["Java", "Python"],
+        "japanese_level": "N2",
+        ...
+    },
+    "matched_projects": [                   # 匹配的项目列表
+        {
+            # 同 matched_engineers 结构
+        },
+        ...
+    ],
+    "total_matches": 10,
+    "high_quality_matches": 5,
+    "processing_time_seconds": 2.5,
+    "recommendations": [],
+    "warnings": []
+}
+
+3. 批量匹配 API
+路径: /api/v1/ai-matching/bulk-matching
+方法: POST
+描述: 大规模自动化匹配案件和简历
+Request Body:
+python{
+    "tenant_id": "uuid",                    # 租户ID（必填）
+    "project_ids": ["uuid1", "uuid2"],      # 项目ID列表（可选，None=所有）
+    "engineer_ids": ["uuid3", "uuid4"],     # 工程师ID列表（可选，None=所有）
+    "executed_by": "uuid",                  # 执行人ID（可选）
+    "matching_type": "string",              # 匹配类型
+    "trigger_type": "string",               # 触发类型
+    "max_matches": 10,                      # 每个项目的最大匹配数
+    "min_score": 0.6,                       # 最小匹配分数
+    "batch_size": 50,                       # 批处理大小（10-100），默认50
+    "generate_top_matches_only": true,      # 只生成高质量匹配，默认true
+    "filters": {}                           # 筛选条件
+}
+Response (BulkMatchingResponse):
+python{
+    "matching_history": {...},              # 同上结构
+    "matches": [                            # 所有匹配结果列表
+        {...},
+        ...
+    ],
+    "batch_summary": {                      # 批次摘要
+        "total_projects": 20,
+        "total_engineers": 100,
+        "total_combinations": 2000,
+        "matches_generated": 150
+    },
+    "top_matches_by_project": {             # 按项目分组的顶级匹配
+        "project_uuid1": [{...}, {...}],
+        "project_uuid2": [{...}, {...}]
+    },
+    "top_matches_by_engineer": {            # 按工程师分组的顶级匹配
+        "engineer_uuid1": [{...}, {...}],
+        "engineer_uuid2": [{...}, {...}]
+    },
+    "total_matches": 150,
+    "high_quality_matches": 75,
+    "processing_time_seconds": 10.5,
+    "recommendations": [],
+    "warnings": []
+}
+
+4. 获取匹配历史 API
+路径: /api/v1/ai-matching/history/{tenant_id}
+方法: GET
+描述: 获取匹配历史记录
+Query Parameters:
+
+limit: 返回数量限制（1-100），默认20
+matching_type: 匹配类型筛选（可选）
+
+Response: List[MatchingHistoryResponse]
+
+5. 获取匹配历史详情 API
+路径: /api/v1/ai-matching/history/{tenant_id}/{history_id}
+方法: GET
+描述: 获取特定匹配历史详情
+Response: MatchingHistoryResponse
+
+6. 根据历史ID获取匹配结果 API
+路径: /api/v1/ai-matching/matches/{tenant_id}/{history_id}
+方法: GET
+描述: 根据历史ID获取具体的匹配结果列表
+Query Parameters:
+
+limit: 返回数量限制（1-500），默认100
+min_score: 最小分数筛选（0-1），默认0
+
+Response: List[MatchResult]
+
+7. 更新匹配状态 API
+路径: /api/v1/ai-matching/matches/{tenant_id}/{match_id}/status
+方法: PUT
+描述: 更新特定匹配的状态
+Query Parameters:
+
+status: 新状态（必填）
+comment: 备注（可选）
+reviewed_by: 审核人ID（可选）
+
+Response:
+python{
+    "status": "success",
+    "message": "匹配状态更新成功",
+    "match_id": "uuid",
+    "new_status": "已保存"
+}
+
+8. 获取匹配统计 API
+路径: /api/v1/ai-matching/statistics/{tenant_id}
+方法: GET
+描述: 获取匹配统计信息
+Query Parameters:
+
+days: 统计天数，默认30
+
+Response (MatchingStatsResponse):
+python{
+    "total_matching_sessions": 100,         # 总匹配会话数
+    "total_matches_generated": 1500,        # 总生成匹配数
+    "average_match_score": 0.75,            # 平均匹配分数
+    "high_quality_match_rate": 0.45,        # 高质量匹配率
+    "stats_by_type": {                      # 按类型统计
+        "project_to_engineers": {...},
+        "engineer_to_projects": {...},
+        "bulk_matching": {...}
+    },
+    "daily_stats": [                        # 每日统计
+        {
+            "date": "2024-01-20",
+            "sessions": 10,
+            "matches": 150
+        },
+        ...
+    ],
+    "top_matched_skills": [                 # 热门匹配技能
+        {"skill": "Java", "count": 200},
+        {"skill": "Python", "count": 180}
+    ],
+    "top_project_types": [                  # 热门项目类型
+        {"type": "Web开发", "count": 50},
+        {"type": "移动应用", "count": 30}
+    ]
+} 这些是我后台关于案件和技术者匹配的api
 这是我的数据库表结构
 之后所有代码中如果有文本的话都用日语

@@ -409,11 +409,9 @@ export const CandidateList: React.FC<CandidateListProps> = ({
                     <TableCell className="japanese-text text-sm">
                       <div className="flex flex-wrap gap-1">
                         {Array.isArray(engineer.status) ? 
-                          engineer.status.map((status, idx) => (
-                            <React.Fragment key={idx}>
-                              {getStatusBadge(status)}
-                            </React.Fragment>
-                          )) : 
+                          engineer.status.map((status, idx) => 
+                            React.cloneElement(getStatusBadge(status), { key: `${status}-${idx}` })
+                          ) : 
                           getStatusBadge(engineer.status)
                         }
                       </div>

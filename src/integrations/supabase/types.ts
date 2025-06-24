@@ -895,6 +895,8 @@ export type Database = {
           is_active: boolean | null
           japanese_level: string | null
           last_active_at: string | null
+          manager_email: string | null
+          manager_name: string | null
           name: string
           nationality: string | null
           nearest_station: string | null
@@ -947,6 +949,8 @@ export type Database = {
           is_active?: boolean | null
           japanese_level?: string | null
           last_active_at?: string | null
+          manager_email?: string | null
+          manager_name?: string | null
           name: string
           nationality?: string | null
           nearest_station?: string | null
@@ -999,6 +1003,8 @@ export type Database = {
           is_active?: boolean | null
           japanese_level?: string | null
           last_active_at?: string | null
+          manager_email?: string | null
+          manager_name?: string | null
           name?: string
           nationality?: string | null
           nearest_station?: string | null

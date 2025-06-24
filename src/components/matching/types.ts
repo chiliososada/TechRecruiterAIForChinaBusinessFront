@@ -30,11 +30,12 @@ export interface CaseDetailItem {
 }
 
 export interface CandidateItem {
-  id: number | string;
+  id: string;
   name: string;
   skills: string | string[];
   companyType?: string;
   companyName?: string;
+  source?: string;
   nationality?: string;
   age?: string;
   gender?: string;
@@ -42,4 +43,7 @@ export interface CandidateItem {
   japaneseLevel?: string;
   availability?: string;
   status?: string[];
+  nearestStation?: string;
+  managerName?: string;
+  managerEmail?: string;
 }

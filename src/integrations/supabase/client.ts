@@ -4,11 +4,7 @@ import type { Database } from './types';
 
 // 環境変数から設定を取得
 const getEnvVar = (key: string, fallback?: string): string => {
-  if (typeof window !== 'undefined') {
-    // ブラウザ環境では import.meta.env を使用（Vite）
-    return (import.meta.env[key] || fallback || '');
-  }
-  return process.env[key] || fallback || '';
+  return import.meta.env[key as keyof ImportMetaEnv] || fallback || '';
 };
 
 // 認証システム用Supabase設定 (identity-hub-control) - 環境変数必須

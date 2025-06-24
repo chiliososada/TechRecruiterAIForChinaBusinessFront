@@ -20,6 +20,8 @@ export const candidatesData: Engineer[] = [
     age: '32歳',
     gender: '男性',
     nearestStation: '品川駅',
+    managerName: '田中一郎',
+    managerEmail: 'tanaka@techinnovation.co.jp',
   },
   {
     id: '2',
@@ -39,6 +41,8 @@ export const candidatesData: Engineer[] = [
     age: '28歳',
     gender: '女性',
     nearestStation: '東京駅',
+    managerName: '佐藤次郎',
+    managerEmail: 'sato@frontend-partners.co.jp',
   },
   {
     id: '3',

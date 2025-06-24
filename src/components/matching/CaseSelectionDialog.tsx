@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileText, Search } from 'lucide-react';
+import { FileText, Search, Loader } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { caseData } from '@/components/cases/data/caseData';
+import { projectService, Project } from '@/services/projectService';
+import { toast } from 'sonner';
 
 export interface CaseItem {
-  id: number;
+  id: string;
   title: string;
   client: string;
   skills?: string[];
@@ -32,35 +33,68 @@ export function CaseSelectionDialog({ onSelect }: CaseSelectionDialogProps) {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [companyTypeFilter, setCompanyTypeFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  
-  // Convert caseData to CaseItem format
-  const existingCases: CaseItem[] = caseData.map(item => ({
-    id: parseInt(item.id),
-    title: item.title,
-    client: item.company,
-    skills: Array.isArray(item.skills) ? item.skills : item.skills ? [item.skills] : [],
-    experience: item.experience,
-    budget: item.budget,
-    location: item.location,
-    workType: item.workType,
-    description: item.description,
-    detailDescription: item.detailDescription,
-    companyType: item.source === 'manual' ? '他社' : '自社', // Using source as a proxy for companyType
-    priority: item.priority
-  }));
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filteredCases, setFilteredCases] = useState<CaseItem[]>([]);
 
-  // Filter cases based on search query and company type
-  const filteredCases = existingCases.filter(caseItem => {
-    const matchesSearch = !searchQuery || 
-      caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      caseItem.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      caseItem.skills?.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesCompanyType = companyTypeFilter === "all" || 
-      caseItem.companyType === companyTypeFilter;
-    
-    return matchesSearch && matchesCompanyType;
-  });
+  // 加载项目数据
+  useEffect(() => {
+    if (open) {
+      loadProjects();
+    }
+  }, [open]);
+
+  // 当搜索或过滤条件改变时更新过滤结果
+  useEffect(() => {
+    filterProjects();
+  }, [projects, searchQuery, companyTypeFilter]);
+
+  const loadProjects = async () => {
+    setLoading(true);
+    try {
+      const projectData = await projectService.getActiveProjects();
+      setProjects(projectData);
+    } catch (error) {
+      console.error('案件データの読み込みに失敗しました:', error);
+      toast("エラー", {
+        description: "案件データの読み込みに失敗しました",
+        style: { backgroundColor: 'hsl(var(--destructive))' },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterProjects = () => {
+    const converted: CaseItem[] = projects.map(project => ({
+      id: project.id,
+      title: project.title,
+      client: project.client_company || project.partner_company || '未設定',
+      skills: project.skills || [],
+      experience: project.experience,
+      budget: project.budget || project.desired_budget,
+      location: project.location,
+      workType: project.work_type,
+      description: project.description,
+      detailDescription: project.detail_description,
+      companyType: project.company_type,
+      priority: project.priority
+    }));
+
+    const filtered = converted.filter(caseItem => {
+      const matchesSearch = !searchQuery || 
+        caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        caseItem.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        caseItem.skills?.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCompanyType = companyTypeFilter === "all" || 
+        caseItem.companyType === companyTypeFilter;
+      
+      return matchesSearch && matchesCompanyType;
+    });
+
+    setFilteredCases(filtered);
+  };
 
   // Handle case selection and close dialog
   const handleSelect = (caseItem: CaseItem) => {
@@ -124,7 +158,16 @@ export function CaseSelectionDialog({ onSelect }: CaseSelectionDialogProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCases.map((caseItem) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="japanese-text">案件データを読み込み中...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredCases.map((caseItem) => (
                 <TableRow key={caseItem.id} className="cursor-pointer hover:bg-muted/40">
                   <TableCell className="font-medium japanese-text">{caseItem.title}</TableCell>
                   <TableCell className="japanese-text">{caseItem.client}</TableCell>

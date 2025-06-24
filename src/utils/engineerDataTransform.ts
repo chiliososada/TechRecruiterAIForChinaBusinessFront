@@ -46,6 +46,8 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
     certifications: ensureArray(dbEngineer.certifications),
     email: dbEngineer.email || '',
     phone: dbEngineer.phone || '',
+    managerName: dbEngineer.manager_name || '',
+    managerEmail: dbEngineer.manager_email || '',
     registeredAt: new Date(dbEngineer.created_at).toLocaleDateString('ja-JP'),
     updatedAt: new Date(dbEngineer.updated_at).toLocaleDateString('ja-JP')
   };
@@ -54,6 +56,10 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
 // 将UI engineer转换为数据库格式
 export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
   console.log('=== transformUIToDatabaseEngineer Input ===', uiEngineer);
+  console.log('=== Manager Fields Check ===', {
+    managerName: uiEngineer.managerName,
+    managerEmail: uiEngineer.managerEmail
+  });
   
   // 处理状态值 - 确保使用正确的数据库状态值
   let dbStatus = '提案中'; // 默认状态
@@ -87,7 +93,9 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     arrival_year_japan: emptyStringToNull(uiEngineer.arrivalYear),
     certifications: ensureArray(uiEngineer.certifications),
     email: emptyStringToNull(uiEngineer.email),
-    phone: emptyStringToNull(uiEngineer.phone)
+    phone: emptyStringToNull(uiEngineer.phone),
+    manager_name: emptyStringToNull(uiEngineer.managerName),
+    manager_email: emptyStringToNull(uiEngineer.managerEmail)
   };
   
   console.log('=== transformUIToDatabaseEngineer Output ===', transformedData);

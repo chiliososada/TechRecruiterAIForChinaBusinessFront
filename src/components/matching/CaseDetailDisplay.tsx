@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 interface CaseItem {
-  id: number;
+  id: string;
   title: string;
   client: string;
   skills?: string[];

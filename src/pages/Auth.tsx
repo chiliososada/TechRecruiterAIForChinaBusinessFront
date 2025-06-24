@@ -83,7 +83,7 @@ export function Auth() {
         </Card>
 
         {/* 開発環境での情報表示 */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <div className="mt-4 p-4 bg-muted rounded-lg">
             <h3 className="font-semibold mb-2 japanese-text">開発情報</h3>
             <div className="text-sm space-y-1 japanese-text">

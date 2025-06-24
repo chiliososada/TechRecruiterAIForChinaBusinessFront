@@ -26,6 +26,8 @@ export interface Engineer {
   selfPromotion?: string; // New field
   workScope?: string; // New field (manufacturing, testing, etc.)
   workExperience?: string; // New field (finance, insurance, etc.)
+  managerName?: string; // 担当者名
+  managerEmail?: string; // 担当者メール
   registeredAt: string;
   updatedAt: string;
 }
@@ -71,6 +73,8 @@ export interface NewEngineerType {
   workExperience: string;
   email: string;
   phone: string;
+  managerName: string; // 担当者名
+  managerEmail: string; // 担当者メール
   registeredAt: string;
   updatedAt: string;
 }

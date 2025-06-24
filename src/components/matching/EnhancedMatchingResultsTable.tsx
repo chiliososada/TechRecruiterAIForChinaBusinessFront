@@ -15,8 +15,8 @@ import { MatchDetailDialog } from './MatchDetailDialog';
 import { SendMessageDialog } from './SendMessageDialog';
 import { EnhancedMatchingResult, CaseDetailItem, CandidateItem } from './types';
 import { toast } from 'sonner';
-import { candidatesData } from '@/components/candidates/data/candidatesData';
 import { exportToCSV } from './utils/exportUtils';
+import { projectService } from '@/services/projectService';
 
 interface EnhancedMatchingResultsTableProps {
   results: EnhancedMatchingResult[];
@@ -34,53 +34,41 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
   const [selectedMatch, setSelectedMatch] = useState<EnhancedMatchingResult | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMessageOpen, setIsMessageOpen] = useState(false);
-  const [memos, setMemos] = useState<Record<string | number, string>>({});
+  const [caseDetails, setCaseDetails] = useState<CaseDetailItem | null>(null);
 
-  // Get case details (dummy implementation)
-  const getCaseDetails = (caseId: number | string): CaseDetailItem => {
-    // This would fetch from API in real implementation
-    return {
-      id: caseId,
-      title: selectedMatch?.caseName || 'Unknown',
-      client: selectedMatch?.caseCompany || 'Unknown',
-      skills: ['JavaScript', 'React', 'TypeScript'],
-      experience: '3年',
-      budget: '60-80万円',
-      description: '金融系システムの開発案件です。React, TypeScriptを使用した画面開発が主な業務となります。',
-      detailDescription: '本案件は大手金融機関向けの新規システム開発プロジェクトです。React、TypeScriptを使用したフロントエンド開発を担当していただきます。アジャイル開発手法を採用しており、2週間単位でのスプリント開発を行います。チームは日本人エンジニア5名と外国籍エンジニア2名で構成されています。',
-      manager: selectedMatch?.caseManager || '未設定'
-    };
+  // Get case details from database
+  const fetchCaseDetails = async (caseId: number | string): Promise<CaseDetailItem | null> => {
+    try {
+      const projectDetail = await projectService.getProjectById(caseId.toString());
+      if (!projectDetail) return null;
+      
+      return {
+        id: caseId,
+        title: projectDetail.title || selectedMatch?.caseName || 'Unknown',
+        client: projectDetail.client_company || projectDetail.partner_company || selectedMatch?.caseCompany || 'Unknown',
+        skills: projectDetail.skills || [],
+        experience: projectDetail.experience || '未設定',
+        budget: projectDetail.budget || projectDetail.desired_budget || '未設定',
+        description: projectDetail.description || '未設定',
+        detailDescription: projectDetail.detail_description || '未設定',
+        manager: selectedMatch?.caseManager || '未設定'
+      };
+    } catch (error) {
+      console.error('案件詳細の取得に失敗:', error);
+      return null;
+    }
   };
 
-  // Get candidate details (dummy implementation)
+  // Get candidate details from the matching result
   const getCandidateDetails = (candidateId: number | string): CandidateItem | undefined => {
-    // Find in candidatesData or return dummy data
-    const candidate = candidatesData.find(c => c.id === candidateId);
-    
-    if (candidate) {
-      return {
-        id: candidateId,
-        name: candidate.name,
-        // Handle skills whether it's an array or string
-        skills: candidate.skills,
-        companyType: candidate.companyType,
-        companyName: candidate.companyName,
-        nationality: candidate.nationality,
-        age: candidate.age,
-        gender: candidate.gender,
-        experience: candidate.experience,
-        japaneseLevel: candidate.japaneseLevel,
-        availability: candidate.availability,
-        status: Array.isArray(candidate.status) ? candidate.status : (candidate.status ? [candidate.status] : [])
-      };
-    }
-    
     return {
-      id: candidateId,
+      id: candidateId.toString(),
       name: selectedMatch?.candidateName || 'Unknown',
       skills: 'JavaScript, React, TypeScript',
       companyName: selectedMatch?.candidateCompany,
-      experience: '5年'
+      experience: '5年',
+      managerName: selectedMatch?.affiliationManager,
+      managerEmail: selectedMatch?.affiliationManagerEmail
     };
   };
 
@@ -130,8 +118,17 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
   };
 
   // Handle view details
-  const handleViewDetails = (match: EnhancedMatchingResult) => {
+  const handleViewDetails = async (match: EnhancedMatchingResult) => {
     setSelectedMatch(match);
+    
+    // Fetch case details from database if caseId exists
+    if (match.caseId) {
+      const details = await fetchCaseDetails(match.caseId);
+      setCaseDetails(details);
+    } else {
+      setCaseDetails(null);
+    }
+    
     setIsDetailOpen(true);
   };
 
@@ -153,13 +150,6 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
     }
   };
 
-  // Handle memo save
-  const handleMemoSave = (id: number | string, memo: string) => {
-    setMemos(prev => ({ ...prev, [id]: memo }));
-    toast("保存完了", {
-      description: "メモが保存されました",
-    });
-  };
 
   // Handle export to CSV
   const handleExportCSV = () => {
@@ -176,10 +166,7 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
     });
   };
 
-  // Get current case and candidate details
-  const currentCaseDetail = selectedMatch?.caseId 
-    ? getCaseDetails(selectedMatch.caseId)
-    : undefined;
+  // Get current candidate details
     
   const currentCandidateDetail = selectedMatch?.candidateId 
     ? getCandidateDetails(selectedMatch.candidateId)
@@ -249,9 +236,6 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
               <TableHead className="w-[200px]">
                 <div className="japanese-text">所属担当者</div>
               </TableHead>
-              <TableHead className="w-[150px]">
-                <div className="japanese-text">メモ</div>
-              </TableHead>
               <TableHead className="w-[120px]">
                 <div className="japanese-text">アクション</div>
               </TableHead>
@@ -309,9 +293,6 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-normal japanese-text">
-                    {memos[result.id] || result.memo || ''}
-                  </TableCell>
                   <TableCell>
                     <div className="flex space-x-1">
                       <Button 
@@ -336,7 +317,7 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-4 japanese-text">
+                <TableCell colSpan={8} className="text-center py-4 japanese-text">
                   マッチング結果がありません
                 </TableCell>
               </TableRow>
@@ -360,9 +341,8 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         matchData={selectedMatch}
-        caseData={currentCaseDetail}
+        caseData={caseDetails}
         candidateData={currentCandidateDetail}
-        onMemoSave={handleMemoSave}
       />
 
       {/* Message dialog */}

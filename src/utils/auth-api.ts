@@ -3,10 +3,7 @@ import { authClient } from '@/integrations/supabase/client';
 
 // 環境変数から取得するように変更（ハードコードを避ける）
 const getEnvVar = (key: string, fallback?: string): string => {
-    if (typeof window !== 'undefined') {
-        return (import.meta.env[key] || fallback || '');
-    }
-    return process.env[key] || fallback || '';
+    return import.meta.env[key as keyof ImportMetaEnv] || fallback || '';
 };
 
 // 認証APIのベースURL (identity-hub-control Edge Functions)

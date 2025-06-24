@@ -15,11 +15,6 @@ export const CandidateSkillsInfo: React.FC<CandidateSkillsInfoProps> = ({ engine
       </div>
       
       <div>
-        <h4 className="text-sm font-medium japanese-text">技術キーワード</h4>
-        <p className="japanese-text">{engineer.technicalKeywords ? (Array.isArray(engineer.technicalKeywords) ? engineer.technicalKeywords.join(', ') : engineer.technicalKeywords) : '未設定'}</p>
-      </div>
-      
-      <div>
         <h4 className="text-sm font-medium japanese-text">資格</h4>
         <p className="japanese-text">{engineer.certifications ? (Array.isArray(engineer.certifications) ? engineer.certifications.join(', ') : engineer.certifications) : '未設定'}</p>
       </div>
