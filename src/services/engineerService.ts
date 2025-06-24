@@ -1,4 +1,4 @@
-// 工程师数据服务
+// エンジニアデータサービス
 import { businessClientManager } from '@/integrations/supabase/business-client';
 
 export interface Engineer {
@@ -52,53 +52,56 @@ export interface Engineer {
 
 class EngineerService {
   
-  // 获取所有活跃工程师
-  async getActiveEngineers(): Promise<Engineer[]> {
+  // アクティブなエンジニアを取得
+  async getActiveEngineers(tenantId: string): Promise<Engineer[]> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('engineers')
         .select('*')
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('获取工程师列表失败:', error);
-        throw new Error(`获取工程师列表失败: ${error.message}`);
+        console.error('エンジニアリスト取得失敗:', error);
+        throw new Error(`エンジニアリスト取得失敗: ${error.message}`);
       }
 
       return data || [];
     } catch (error) {
-      console.error('工程师服务错误:', error);
+      console.error('エンジニアサービスエラー:', error);
       throw error;
     }
   }
 
-  // 根据ID获取工程师详情
-  async getEngineerById(engineerId: string): Promise<Engineer | null> {
+  // IDからエンジニア詳細を取得
+  async getEngineerById(engineerId: string, tenantId: string): Promise<Engineer | null> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('engineers')
         .select('*')
         .eq('id', engineerId)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .single();
 
       if (error) {
-        console.error('获取工程师详情失败:', error);
+        console.error('エンジニア詳細取得失敗:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('获取工程师详情错误:', error);
+      console.error('エンジニア詳細取得エラー:', error);
       return null;
     }
   }
 
-  // 根据条件搜索工程师
+  // 条件によるエンジニア検索
   async searchEngineers(searchParams: {
+    tenantId: string;
     query?: string;
     companyType?: string;
     status?: string;
@@ -111,34 +114,35 @@ class EngineerService {
       let query = client
         .from('engineers')
         .select('*')
+        .eq('tenant_id', searchParams.tenantId)
         .eq('is_active', true);
 
-      // 添加文本搜索
+      // テキスト検索を追加
       if (searchParams.query) {
         query = query.or(`name.ilike.%${searchParams.query}%,email.ilike.%${searchParams.query}%,company_name.ilike.%${searchParams.query}%`);
       }
 
-      // 添加公司类型过滤
+      // 会社タイプフィルタを追加
       if (searchParams.companyType && searchParams.companyType !== 'all') {
         query = query.eq('company_type', searchParams.companyType);
       }
 
-      // 添加状态过滤
+      // ステータスフィルタを追加
       if (searchParams.status && searchParams.status !== 'all') {
         query = query.eq('current_status', searchParams.status);
       }
 
-      // 添加技能过滤
+      // スキルフィルタを追加
       if (searchParams.skills && searchParams.skills.length > 0) {
         query = query.overlaps('skills', searchParams.skills);
       }
 
-      // 添加日语水平过滤
+      // 日本語レベルフィルタを追加
       if (searchParams.japaneseLevel && searchParams.japaneseLevel !== 'all') {
         query = query.eq('japanese_level', searchParams.japaneseLevel);
       }
 
-      // 添加国籍过滤
+      // 国籍フィルタを追加
       if (searchParams.nationality && searchParams.nationality !== 'all') {
         query = query.eq('nationality', searchParams.nationality);
       }
@@ -146,62 +150,64 @@ class EngineerService {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
-        console.error('搜索工程师失败:', error);
-        throw new Error(`搜索工程师失败: ${error.message}`);
+        console.error('エンジニア検索失敗:', error);
+        throw new Error(`エンジニア検索失敗: ${error.message}`);
       }
 
       return data || [];
     } catch (error) {
-      console.error('工程师搜索错误:', error);
+      console.error('エンジニア検索エラー:', error);
       throw error;
     }
   }
 
-  // 获取技能列表
-  async getSkillsList(): Promise<string[]> {
+  // スキルリストを取得
+  async getSkillsList(tenantId: string): Promise<string[]> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('engineers')
         .select('skills')
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .not('skills', 'is', null);
 
       if (error) {
-        console.error('获取技能列表失败:', error);
+        console.error('スキルリスト取得失敗:', error);
         return [];
       }
 
-      // 展开所有技能数组并去重
+      // 全スキル配列を展開して重複除去
       const allSkills = data.flatMap(item => item.skills || []);
       const uniqueSkills = [...new Set(allSkills)].filter(Boolean);
       return uniqueSkills.sort();
     } catch (error) {
-      console.error('获取技能列表错误:', error);
+      console.error('スキルリスト取得エラー:', error);
       return [];
     }
   }
 
-  // 获取国籍列表
-  async getNationalityList(): Promise<string[]> {
+  // 国籍リストを取得
+  async getNationalityList(tenantId: string): Promise<string[]> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('engineers')
         .select('nationality')
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .not('nationality', 'is', null);
 
       if (error) {
-        console.error('获取国籍列表失败:', error);
+        console.error('国籍リスト取得失敗:', error);
         return [];
       }
 
-      // 去重并过滤空值
+      // 重複除去と空値フィルタ
       const nationalities = [...new Set(data.map(item => item.nationality).filter(Boolean))];
       return nationalities.sort();
     } catch (error) {
-      console.error('获取国籍列表错误:', error);
+      console.error('国籍リスト取得エラー:', error);
       return [];
     }
   }

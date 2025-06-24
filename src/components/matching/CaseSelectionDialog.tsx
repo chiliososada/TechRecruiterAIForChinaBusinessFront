@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { projectService, Project } from '@/services/projectService';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export interface CaseItem {
@@ -36,6 +37,7 @@ export function CaseSelectionDialog({ onSelect }: CaseSelectionDialogProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [filteredCases, setFilteredCases] = useState<CaseItem[]>([]);
+  const { currentTenant } = useAuth();
 
   // 加载项目数据
   useEffect(() => {
@@ -50,9 +52,18 @@ export function CaseSelectionDialog({ onSelect }: CaseSelectionDialogProps) {
   }, [projects, searchQuery, companyTypeFilter]);
 
   const loadProjects = async () => {
+    if (!currentTenant?.id) {
+      console.error('テナントIDが見つかりません');
+      toast("エラー", {
+        description: "テナント情報が見つかりません",
+        style: { backgroundColor: 'hsl(var(--destructive))' },
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const projectData = await projectService.getActiveProjects();
+      const projectData = await projectService.getActiveProjects(currentTenant.id);
       setProjects(projectData);
     } catch (error) {
       console.error('案件データの読み込みに失敗しました:', error);

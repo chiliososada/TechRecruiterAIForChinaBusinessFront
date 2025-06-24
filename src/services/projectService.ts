@@ -1,5 +1,6 @@
-// 项目数据服务
+// 案件データサービス
 import { businessClientManager } from '@/integrations/supabase/business-client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Project {
   id: string;
@@ -37,53 +38,56 @@ export interface Project {
 
 class ProjectService {
   
-  // 获取所有活跃项目
-  async getActiveProjects(): Promise<Project[]> {
+  // アクティブな案件を取得
+  async getActiveProjects(tenantId: string): Promise<Project[]> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('projects')
         .select('*')
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('获取项目列表失败:', error);
-        throw new Error(`获取项目列表失败: ${error.message}`);
+        console.error('案件リスト取得失敗:', error);
+        throw new Error(`案件リスト取得失敗: ${error.message}`);
       }
 
       return data || [];
     } catch (error) {
-      console.error('项目服务错误:', error);
+      console.error('案件サービスエラー:', error);
       throw error;
     }
   }
 
-  // 根据ID获取项目详情
-  async getProjectById(projectId: string): Promise<Project | null> {
+  // IDから案件詳細を取得
+  async getProjectById(projectId: string, tenantId: string): Promise<Project | null> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('projects')
         .select('*')
         .eq('id', projectId)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .single();
 
       if (error) {
-        console.error('获取项目详情失败:', error);
+        console.error('案件詳細取得失敗:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('获取项目详情错误:', error);
+      console.error('案件詳細取得エラー:', error);
       return null;
     }
   }
 
-  // 根据条件搜索项目
+  // 条件による案件検索
   async searchProjects(searchParams: {
+    tenantId: string;
     query?: string;
     companyType?: string;
     status?: string;
@@ -94,24 +98,25 @@ class ProjectService {
       let query = client
         .from('projects')
         .select('*')
+        .eq('tenant_id', searchParams.tenantId)
         .eq('is_active', true);
 
-      // 添加文本搜索
+      // テキスト検索を追加
       if (searchParams.query) {
         query = query.or(`title.ilike.%${searchParams.query}%,description.ilike.%${searchParams.query}%,client_company.ilike.%${searchParams.query}%`);
       }
 
-      // 添加公司类型过滤
+      // 会社タイプフィルタを追加
       if (searchParams.companyType && searchParams.companyType !== 'all') {
         query = query.eq('company_type', searchParams.companyType);
       }
 
-      // 添加状态过滤
+      // ステータスフィルタを追加
       if (searchParams.status && searchParams.status !== 'all') {
         query = query.eq('status', searchParams.status);
       }
 
-      // 添加技能过滤
+      // スキルフィルタを追加
       if (searchParams.skills && searchParams.skills.length > 0) {
         query = query.overlaps('skills', searchParams.skills);
       }
@@ -119,37 +124,38 @@ class ProjectService {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
-        console.error('搜索项目失败:', error);
-        throw new Error(`搜索项目失败: ${error.message}`);
+        console.error('案件検索失敗:', error);
+        throw new Error(`案件検索失敗: ${error.message}`);
       }
 
       return data || [];
     } catch (error) {
-      console.error('项目搜索错误:', error);
+      console.error('案件検索エラー:', error);
       throw error;
     }
   }
 
-  // 获取公司列表
-  async getCompanyList(): Promise<string[]> {
+  // 会社リストを取得
+  async getCompanyList(tenantId: string): Promise<string[]> {
     try {
       const client = businessClientManager.getClient();
       const { data, error } = await client
         .from('projects')
         .select('client_company')
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .not('client_company', 'is', null);
 
       if (error) {
-        console.error('获取公司列表失败:', error);
+        console.error('会社リスト取得失敗:', error);
         return [];
       }
 
-      // 去重并过滤空值
+      // 重複除去と空値フィルタ
       const companies = [...new Set(data.map(item => item.client_company).filter(Boolean))];
       return companies;
     } catch (error) {
-      console.error('获取公司列表错误:', error);
+      console.error('会社リスト取得エラー:', error);
       return [];
     }
   }

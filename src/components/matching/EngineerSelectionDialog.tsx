@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { engineerService, Engineer } from '@/services/engineerService';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export interface EngineerItem {
@@ -37,6 +38,7 @@ export function EngineerSelectionDialog({ onSelect }: EngineerSelectionDialogPro
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [loading, setLoading] = useState(false);
   const [filteredEngineers, setFilteredEngineers] = useState<EngineerItem[]>([]);
+  const { currentTenant } = useAuth();
 
   // 加载工程师数据
   useEffect(() => {
@@ -51,9 +53,18 @@ export function EngineerSelectionDialog({ onSelect }: EngineerSelectionDialogPro
   }, [engineers, searchQuery, companyTypeFilter, statusFilter]);
 
   const loadEngineers = async () => {
+    if (!currentTenant?.id) {
+      console.error('テナントIDが見つかりません');
+      toast("エラー", {
+        description: "テナント情報が見つかりません",
+        style: { backgroundColor: 'hsl(var(--destructive))' },
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const engineerData = await engineerService.getActiveEngineers();
+      const engineerData = await engineerService.getActiveEngineers(currentTenant.id);
       setEngineers(engineerData);
     } catch (error) {
       console.error('エンジニアデータの読み込みに失敗しました:', error);

@@ -17,10 +17,12 @@ import {
   formatMatchScore
 } from '@/services/aiMatchingService';
 import { projectService } from '@/services/projectService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function CandidateToCase() {
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateItem | null>(null);
   const [matchingStarted, setMatchingStarted] = useState(false);
+  const { currentTenant } = useAuth();
   const [matchingComplete, setMatchingComplete] = useState(false);
   const [progress, setProgress] = useState(0);
   const [matchingResults, setMatchingResults] = useState<EnhancedMatchingResult[]>([]);
@@ -70,9 +72,14 @@ export function CandidateToCase() {
       // project_idがある場合、詳細情報を取得
       if (project.project_id) {
         try {
-          const projectDetail = await projectService.getProjectById(project.project_id);
-          if (projectDetail) {
-            caseCompany = projectDetail.client_company || projectDetail.partner_company || '未設定';
+          if (!currentTenant?.id) {
+            console.error('テナントIDが見つかりません');
+            caseCompany = '未設定';
+          } else {
+            const projectDetail = await projectService.getProjectById(project.project_id, currentTenant.id);
+            if (projectDetail) {
+              caseCompany = projectDetail.client_company || projectDetail.partner_company || '未設定';
+            }
           }
         } catch (error) {
           console.error('プロジェクト詳細の取得に失敗:', error);

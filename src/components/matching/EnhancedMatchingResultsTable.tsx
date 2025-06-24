@@ -17,6 +17,7 @@ import { EnhancedMatchingResult, CaseDetailItem, CandidateItem } from './types';
 import { toast } from 'sonner';
 import { exportToCSV } from './utils/exportUtils';
 import { projectService } from '@/services/projectService';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EnhancedMatchingResultsTableProps {
   results: EnhancedMatchingResult[];
@@ -35,11 +36,17 @@ export const EnhancedMatchingResultsTable: React.FC<EnhancedMatchingResultsTable
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMessageOpen, setIsMessageOpen] = useState(false);
   const [caseDetails, setCaseDetails] = useState<CaseDetailItem | null>(null);
+  const { currentTenant } = useAuth();
 
   // Get case details from database
   const fetchCaseDetails = async (caseId: number | string): Promise<CaseDetailItem | null> => {
+    if (!currentTenant?.id) {
+      console.error('テナントIDが見つかりません');
+      return null;
+    }
+
     try {
-      const projectDetail = await projectService.getProjectById(caseId.toString());
+      const projectDetail = await projectService.getProjectById(caseId.toString(), currentTenant.id);
       if (!projectDetail) return null;
       
       return {
