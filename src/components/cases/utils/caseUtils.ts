@@ -2,7 +2,7 @@
 import { MailCase } from "../email/types";
 import { parse, isValid } from 'date-fns';
 
-// Archive conditions function - 更新归档条件
+// Archive conditions function - アーカイブ条件の更新
 export const isArchiveCandidate = (caseItem: MailCase): boolean => {
   const currentMonthStart = new Date();
   currentMonthStart.setDate(1);
@@ -14,7 +14,7 @@ export const isArchiveCandidate = (caseItem: MailCase): boolean => {
   console.log(`Case start date: ${caseItem.startDate}`);
   console.log(`Case status: ${caseItem.status}`);
   
-  // 条件1: 参画开始日が当前年月より前の案件
+  // 条件1: 参画開始日が当該年月より前の案件
   if (caseItem.startDate) {
     const startDate = new Date(caseItem.startDate);
     console.log(`Start date parsed: ${startDate.toISOString()}`);
@@ -26,8 +26,8 @@ export const isArchiveCandidate = (caseItem: MailCase): boolean => {
     }
   }
   
-  // 条件2: ステータスが「募集終了」の案件（UI显示状态，对应数据库中的'募集完了'）
-  // 检查两种可能的状态值
+  // 条件2: ステータスが「募集終了」の案件（UI表示ステータス、データベースの'募集完了'に対応）
+  // 2つの可能なステータス値をチェック
   if (caseItem.status === '募集終了' || caseItem.status === '募集完了') {
     console.log('✓ Archive candidate: status is 募集終了 or 募集完了');
     return true;

@@ -41,6 +41,10 @@ interface CandidateDetailProps {
   nationality?: string;
   age?: string;
   gender?: string;
+  currentStatus?: string;
+  nearestStation?: string;
+  companyType?: string;
+  arrivalYearJapan?: string;
 }
 
 interface CandidateDetailDialogProps {
@@ -99,16 +103,6 @@ export const CandidateDetailDialog: React.FC<CandidateDetailDialogProps> = ({
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium japanese-text">経験年数</p>
-                <p>{candidateData.experience || '未設定'}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium japanese-text">希望勤務地</p>
-                <p>{candidateData.preferredWorkLocation || '未設定'}</p>
-              </div>
-              
-              <div>
                 <p className="text-sm font-medium japanese-text">日本語レベル</p>
                 <p>{candidateData.japaneseLevel || '未設定'}</p>
               </div>
@@ -119,11 +113,31 @@ export const CandidateDetailDialog: React.FC<CandidateDetailDialogProps> = ({
               </div>
               
               <div>
-                <p className="text-sm font-medium japanese-text">単価</p>
-                <p>{candidateData.hourlyRate || '未設定'}</p>
+                <p className="text-sm font-medium japanese-text">営業状態</p>
+                <p>{candidateData.currentStatus || '未設定'}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium japanese-text">最寄駅</p>
+                <p>{candidateData.nearestStation || '未設定'}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium japanese-text">経験年数</p>
+                <p>{candidateData.experience || '未設定'}</p>
               </div>
 
-              {/* New fields */}
+              <div>
+                <p className="text-sm font-medium japanese-text">会社種別</p>
+                <p>{candidateData.companyType || '未設定'}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium japanese-text">来日年度</p>
+                <p>{candidateData.arrivalYearJapan || '未設定'}</p>
+              </div>
+
+              {/* Additional fields */}
               <div>
                 <p className="text-sm font-medium japanese-text flex items-center gap-1">
                   <Flag className="h-4 w-4" />

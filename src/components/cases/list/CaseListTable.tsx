@@ -86,7 +86,7 @@ export const CaseListTable: React.FC<CaseListTableProps> = ({
             </TableHead>
             <TableHead className="japanese-text font-medium">勤務地</TableHead>
             <TableHead className="japanese-text font-medium">スキル要件</TableHead>
-            <TableHead className="japanese-text font-medium">工程</TableHead>
+            <TableHead className="japanese-text font-medium">作業範囲</TableHead>
             <TableHead className="japanese-text font-medium">面談回数</TableHead>
             <TableHead className="japanese-text font-medium">予算</TableHead>
             <TableHead className="japanese-text font-medium">外国人</TableHead>

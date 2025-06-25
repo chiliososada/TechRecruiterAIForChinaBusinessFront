@@ -277,10 +277,28 @@ export function CaseToCandidate() {
       {matchingResults.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="japanese-text">マッチング結果</CardTitle>
-            <CardDescription className="japanese-text">
-              {selectedCase?.title || '選択された案件'}に合う候補者が見つかりました
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="japanese-text">マッチング結果</CardTitle>
+                <CardDescription className="japanese-text">
+                  {selectedCase?.title || '選択された案件'}に合う候補者が見つかりました
+                  {apiResponse && (
+                    <span className="block mt-1">
+                      総マッチ数: {apiResponse.total_matches}件 | 
+                      高品質マッチ: {apiResponse.high_quality_matches}件 | 
+                      処理時間: {apiResponse.processing_time_seconds.toFixed(1)}秒
+                    </span>
+                  )}
+                </CardDescription>
+              </div>
+              {apiResponse && (
+                <div className="text-right">
+                  <Badge variant="outline" className="japanese-text">
+                    スコア閾値: {formatMatchScore(defaultMinScore)}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <EnhancedMatchingResultsTable results={matchingResults} />

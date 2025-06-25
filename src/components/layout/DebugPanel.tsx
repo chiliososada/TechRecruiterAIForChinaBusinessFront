@@ -1,4 +1,4 @@
-// デバッグパネルコンポーネント（開発環境のみ表示）- 简化版
+// デバッグパネルコンポーネント（開発環境のみ表示）- 簡略版
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

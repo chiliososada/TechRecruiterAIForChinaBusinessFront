@@ -15,6 +15,16 @@ export interface EnhancedMatchingResult {
   affiliationManagerEmail?: string; // Added affiliation manager email property
   memo?: string;
   recommendationComment?: string; // Added recommendation comment property
+  // 一括マッチング用の追加フィールド
+  skills?: string[];
+  matchedSkills?: string;
+  experience?: string;
+  nationality?: string;
+  age?: string;
+  gender?: string;
+  // 詳細データ
+  projectDetail?: any;
+  engineerDetail?: any;
 }
 
 export interface CaseDetailItem {

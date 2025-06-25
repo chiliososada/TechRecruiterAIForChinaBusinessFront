@@ -11,7 +11,7 @@ import { PieChart as RechartsChart, Pie, Cell, Tooltip, Legend, ResponsiveContai
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, generatePaginationRange } from '@/components/ui/pagination';
 import { toast } from '@/hooks/use-toast';
 
-// 示例数据
+// サンプルデータ
 const companyData = [
   {
     id: 1,
@@ -75,21 +75,21 @@ const companyData = [
   }
 ];
 
-// 会社类型翻译
+// 会社タイプ翻訳
 const companyTypeTranslation: Record<string, string> = {
   'cases': '案件系',
   'engineers': '技術者系',
   'mixed': '混合型'
 };
 
-// 会社类型对应的颜色
+// 会社タイプに対応する色
 const companyTypeColors: Record<string, string> = {
   'cases': 'bg-blue-100 text-blue-800',
   'engineers': 'bg-green-100 text-green-800',
   'mixed': 'bg-purple-100 text-purple-800'
 };
 
-// 图表数据
+// チャートデータ
 const chartData = [
   { name: '案件系企業', value: 2, color: '#3b82f6' },
   { name: '技術者系企業', value: 2, color: '#22c55e' },

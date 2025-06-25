@@ -263,7 +263,10 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
           </TabsContent>
           
           <TabsContent value="resume" contextId={tabContextId}>
-            <ResumeUpload onCreateEngineer={handleCreateEngineer} />
+            <ResumeUpload 
+              onCreateEngineer={handleCreateEngineer} 
+              isOwnCompany={effectiveCompanyType === 'own'} 
+            />
           </TabsContent>
         </TabsWithContext>
 

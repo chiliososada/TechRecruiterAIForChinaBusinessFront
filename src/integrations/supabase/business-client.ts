@@ -1,7 +1,7 @@
-// 简化版业务数据库客户端 - Postman方式（去掉JWT）
+// 簡略版業務データベースクライアント - Postman方式（JWT除去）
 import { businessClient } from './client';
 
-// 简化的业务データアクセス用クライアント管理
+// 簡略化された業務データアクセス用クライアント管理
 class BusinessClientManager {
     private static instance: BusinessClientManager;
     private isInitialized = false;

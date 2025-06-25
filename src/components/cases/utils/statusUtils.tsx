@@ -78,21 +78,28 @@ export const getAvailableStatuses = () => [
   { value: '要確認', label: '要確認' },
 ];
 
-// Get default process options for case management
-export const getDefaultProcesses = (): string[] => [
+// Get default work scope options for case management
+const defaultWorkScopes = [
   '要件定義',
   '基本設計',
   '詳細設計',
-  '実装',
-  'テスト',
-  '運用・保守'
+  '製造',
+  '単体テスト',
+  '結合テスト',
+  '総合テスト',
+  '運用保守'
 ];
 
-// 正规化数据库状态到显示状态的映射
+export const getDefaultWorkScopes = (): string[] => defaultWorkScopes;
+
+// 後方互換性のため
+export const getDefaultProcesses = (): string[] => defaultWorkScopes;
+
+// データベースステータスから表示ステータスへの正規化マッピング
 export const normalizeStatus = (dbStatus: string): string => {
   const statusMap: Record<string, string> = {
     '募集中': '募集中',
-    '募集完了': '募集終了', // 数据库中的'募集完了'映射到UI显示的'募集終了'
+    '募集完了': '募集終了', // データベースの'募集完了'をUI表示の'募集終了'にマッピング
     'アーカイブ済': 'アーカイブ済',
     '保留中': '保留中',
     '要確認': '要確認',
@@ -102,7 +109,7 @@ export const normalizeStatus = (dbStatus: string): string => {
   return statusMap[dbStatus] || dbStatus;
 };
 
-// 检查是否为已归档状态
+// アーカイブ済みステータスかどうかをチェック
 export const isArchivedStatus = (status: string): boolean => {
   return status === 'アーカイブ済';
 };

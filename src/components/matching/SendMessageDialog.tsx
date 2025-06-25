@@ -17,6 +17,8 @@ import { EnhancedMatchingResult } from './types';
 import { toast } from 'sonner';
 import { Send, Pencil, Eye, EyeOff, User, Users } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { sendIndividualEmail } from '@/utils/backend-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Define email templates
 const EMAIL_TEMPLATES = [
@@ -31,6 +33,12 @@ const EMAIL_TEMPLATES = [
     name: '人材紹介テンプレート',
     subject: '【人材紹介】{{candidateName}} - {{candidateSkills}}',
     body: `{{recipientName}} 様\n\n株式会社〇〇の〇〇でございます。\n\nこの度は、以下の人材をご紹介させていただきます。\n\n■名前: {{candidateName}}\n■スキル: {{candidateSkills}}\n■経験: {{candidateExperience}}\n\n上記案件に最適なマッチングと判断いたしました。ご検討いただけますと幸いです。\n\nよろしくお願い申し上げます。`
+  },
+  {
+    id: 'template-project-intro',
+    name: '案件推薦テンプレート（人材向け）',
+    subject: '【案件推薦】{{caseName}} - マッチング率{{matchingRate}}',
+    body: `{{recipientName}} 様\n\nお世話になっております。\n\n{{candidateName}}様のスキルセットに最適な案件をご紹介させていただきます。\n\n■案件名: {{caseName}}\n■クライアント: {{caseCompany}}\n■マッチング率: {{matchingRate}}\n■案件担当者: {{caseManager}}\n\n■マッチング理由:\n{{matchingReason}}\n\nご興味がございましたら、詳細をご説明させていただきます。\n\nよろしくお願い申し上げます。`
   }
 ];
 
@@ -56,6 +64,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
   const [showSignature, setShowSignature] = useState(true);
   const [emailAddress, setEmailAddress] = useState('');
   const [isContactSelectOpen, setIsContactSelectOpen] = useState(false);
+  const { user, currentTenant } = useAuth();
 
   // This useEffect will run whenever isOpen or matchData changes
   useEffect(() => {
@@ -87,16 +96,25 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
     let newSubject = template.subject;
     let newBody = template.body;
     
-    // Replace case placeholders
+    // Replace common placeholders
     newSubject = newSubject.replace(/{{caseName}}/g, matchData.caseName || '');
     newSubject = newSubject.replace(/{{caseCompany}}/g, matchData.caseCompany || '');
+    newSubject = newSubject.replace(/{{candidateName}}/g, matchData.candidateName || '');
+    newSubject = newSubject.replace(/{{matchingRate}}/g, matchData.matchingRate || '');
     
-    newBody = newBody.replace(/{{recipientName}}/g, matchData.caseCompany || '担当者');
+    // Determine recipient name based on context
+    const recipientName = templateId === 'template-project-intro' 
+      ? (matchData.affiliationManager || matchData.candidateName || '担当者')
+      : (matchData.caseManager || matchData.caseCompany || '担当者');
+    
+    newBody = newBody.replace(/{{recipientName}}/g, recipientName);
     newBody = newBody.replace(/{{caseName}}/g, matchData.caseName || '');
     newBody = newBody.replace(/{{caseCompany}}/g, matchData.caseCompany || '');
     newBody = newBody.replace(/{{caseSkills}}/g, 'Java, Spring, React, TypeScript');
     newBody = newBody.replace(/{{caseDescription}}/g, '金融系システムの開発案件です。React, TypeScriptを使用した画面開発が主な業務となります。');
     newBody = newBody.replace(/{{caseManager}}/g, matchData.caseManager || '未設定');
+    newBody = newBody.replace(/{{matchingRate}}/g, matchData.matchingRate || '');
+    newBody = newBody.replace(/{{matchingReason}}/g, matchData.matchingReason || matchData.recommendationComment || '');
     
     // Replace candidate placeholders
     newBody = newBody.replace(/{{candidateName}}/g, matchData.candidateName || '');
@@ -107,7 +125,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
     setMessage(newBody);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!subject.trim() || !message.trim()) {
       toast.error("エラー", {
         description: "件名とメッセージを入力してください",
@@ -124,14 +142,60 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
 
     setSending(true);
     
-    // Simulate sending
-    setTimeout(() => {
+    try {
+      // ユーザー情報の確認
+      if (!currentTenant?.id) {
+        toast.error("エラー", {
+          description: "テナント情報が見つかりません。再度ログインしてください。",
+        });
+        setSending(false);
+        return;
+      }
+
+      // メッセージと署名を結合
+      const fullMessage = showSignature && signature ? `${message}\n\n${signature}` : message;
+      
+      // ユーザーコンテキストを作成
+      const userContext = {
+        tenant_id: currentTenant.id,
+        email: user?.email || ''
+      };
+
+      // APIを呼び出してメールを送信
+      const result = await sendIndividualEmail({
+        to_emails: [emailAddress],
+        subject: subject,
+        body_text: fullMessage,
+        body_html: fullMessage.replace(/\n/g, '<br>'),
+        priority: 5,
+        related_project_id: matchData.caseId?.toString(),
+        related_engineer_id: matchData.candidateId?.toString(),
+        metadata: {
+          matchingId: matchData.id,
+          caseName: matchData.caseName,
+          candidateName: matchData.candidateName,
+          matchingRate: matchData.matchingRate,
+        }
+      }, userContext);
+
       setSending(false);
-      toast.success("送信完了", {
-        description: "メッセージが正常に送信されました",
+
+      if (result.success) {
+        toast.success("送信完了", {
+          description: result.message || "メールが正常に送信されました",
+        });
+        onClose();
+      } else {
+        toast.error("送信失敗", {
+          description: result.message || "メール送信に失敗しました",
+        });
+      }
+    } catch (error) {
+      setSending(false);
+      toast.error("エラー", {
+        description: error instanceof Error ? error.message : "メール送信中にエラーが発生しました",
       });
-      onClose();
-    }, 1000);
+    }
   };
   
   const handleSignatureChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -148,11 +212,6 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
   
   const toggleSignatureVisibility = () => {
     setShowSignature(!showSignature);
-  };
-  
-  const getFullMessage = () => {
-    if (!signature || !showSignature) return message;
-    return message.trim() + '\n\n' + signature;
   };
 
   // Handle selecting a contact for email

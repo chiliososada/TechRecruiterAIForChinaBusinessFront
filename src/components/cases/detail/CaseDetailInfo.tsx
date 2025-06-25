@@ -202,7 +202,7 @@ export const CaseDetailInfo: React.FC<CaseDetailInfoProps> = ({ selectedCase }) 
       <div className="col-span-2 mt-2">
         <h4 className="text-sm font-medium mb-1 japanese-text flex items-center">
           <FileCode className="h-4 w-4 mr-1 text-purple-600" />
-          工程
+          作業範囲
         </h4>
         <div className="flex flex-wrap gap-1.5 bg-purple-50 p-2 rounded-md">
           {selectedCase.processes && selectedCase.processes.length > 0 ? (

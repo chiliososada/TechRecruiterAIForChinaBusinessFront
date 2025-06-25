@@ -10,7 +10,7 @@ import { Calendar, Search, Filter, ArrowDown, ArrowUp, Mail, FileText } from 'lu
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, generatePaginationRange } from '@/components/ui/pagination';
 
-// 示例数据
+// サンプルデータ
 const emailData = [
   {
     id: 1,

@@ -491,7 +491,7 @@ export function StructuredCaseForm() {
       <div className="mt-4">
         <div className="flex items-center space-x-2">
           <FileCode className="h-4 w-4 mr-1 text-purple-600" />
-          <Label className="text-sm font-medium mb-1 japanese-text">工程</Label>
+          <Label className="text-sm font-medium mb-1 japanese-text">作業範囲</Label>
         </div>
         <div className="grid grid-cols-2 gap-2 border rounded-md p-3 bg-muted/5 mt-1">
           {processOptions.map((process) => (

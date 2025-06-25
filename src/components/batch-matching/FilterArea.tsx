@@ -3,6 +3,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Loader } from 'lucide-react';
 
 interface FilterAreaProps {
   filterCaseAffiliation: string;
@@ -11,7 +13,10 @@ interface FilterAreaProps {
   setFilterCandidateAffiliation: (value: string) => void;
   filterCaseStartDate: string;
   setFilterCaseStartDate: (value: string) => void;
+  minScore: number;
+  setMinScore: (value: number) => void;
   handleSearch: () => void;
+  isLoading: boolean;
 }
 
 export const FilterArea: React.FC<FilterAreaProps> = ({
@@ -21,12 +26,15 @@ export const FilterArea: React.FC<FilterAreaProps> = ({
   setFilterCandidateAffiliation,
   filterCaseStartDate,
   setFilterCaseStartDate,
-  handleSearch
+  minScore,
+  setMinScore,
+  handleSearch,
+  isLoading
 }) => {
   return (
     <div className="p-6 bg-white rounded-lg shadow-sm border mb-6">
       <h3 className="text-lg font-medium mb-4 japanese-text">フィルター条件設定</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium japanese-text">案件の所属</label>
           <Select value={filterCaseAffiliation} onValueChange={setFilterCaseAffiliation}>
@@ -34,7 +42,7 @@ export const FilterArea: React.FC<FilterAreaProps> = ({
               <SelectValue placeholder="選択してください" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="placeholder">選択してください</SelectItem>
+              <SelectItem value="all">すべて</SelectItem>
               <SelectItem value="自社">自社</SelectItem>
               <SelectItem value="他社">他社</SelectItem>
             </SelectContent>
@@ -47,19 +55,31 @@ export const FilterArea: React.FC<FilterAreaProps> = ({
               <SelectValue placeholder="選択してください" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="placeholder">選択してください</SelectItem>
+              <SelectItem value="all">すべて</SelectItem>
               <SelectItem value="自社">自社</SelectItem>
               <SelectItem value="他社">他社</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium japanese-text">案件の開始時期</label>
-          <input 
-            type="month"
+          <label className="text-sm font-medium japanese-text">案件開始時期</label>
+          <Input 
+            type="date"
             value={filterCaseStartDate}
             onChange={(e) => setFilterCaseStartDate(e.target.value)}
-            className="w-full h-10 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+            placeholder="YYYY-MM-DD"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium japanese-text">スコア閾値 ({Math.round(minScore * 100)}%)</label>
+          <Input
+            type="range"
+            min="0.1"
+            max="1.0"
+            step="0.1"
+            value={minScore}
+            onChange={(e) => setMinScore(parseFloat(e.target.value))}
+            className="w-full"
           />
         </div>
       </div>
@@ -68,8 +88,16 @@ export const FilterArea: React.FC<FilterAreaProps> = ({
         <Button 
           onClick={handleSearch} 
           className="japanese-text"
+          disabled={isLoading}
         >
-          マッチング検索
+          {isLoading ? (
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              マッチング処理中...
+            </>
+          ) : (
+            'マッチング検索'
+          )}
         </Button>
       </div>
     </div>

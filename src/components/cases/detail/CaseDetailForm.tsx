@@ -242,7 +242,7 @@ export const CaseDetailForm: React.FC<CaseDetailFormProps> = ({
       <div className="col-span-2 space-y-2">
         <label className="text-sm font-medium japanese-text flex items-center">
           <FileCode className="h-4 w-4 mr-1 text-gray-600" />
-          工程
+          作業範囲
         </label>
         <div className="grid grid-cols-2 gap-2 border rounded-md p-3 bg-muted/5">
           {processOptions.map((process) => (

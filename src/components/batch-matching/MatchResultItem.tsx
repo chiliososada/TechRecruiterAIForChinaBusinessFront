@@ -39,8 +39,8 @@ export const MatchResultItem: React.FC<MatchResultItemProps> = ({
             <p className="text-sm text-gray-700"><span className="font-medium">所属会社:</span> {result.candidateCompany}</p>
             <p className="text-sm text-gray-700"><span className="font-medium">所属担当者:</span> {result.affiliationManager}</p>
             <p className="text-sm text-gray-700 text-xs">{result.affiliationManagerEmail}</p>
-            <p className="text-sm text-gray-700"><span className="font-medium">スキル:</span> {result.skills.join(', ')}</p>
-            <p className="text-sm text-gray-700"><span className="font-medium">経験:</span> {result.experience}</p>
+            <p className="text-sm text-gray-700"><span className="font-medium">スキル:</span> {result.skills && Array.isArray(result.skills) ? result.skills.join(', ') : result.matchedSkills || '未設定'}</p>
+            <p className="text-sm text-gray-700"><span className="font-medium">経験:</span> {result.experience || '未設定'}</p>
             
             {/* Technician information fields */}
             <div className="grid grid-cols-3 gap-2 mt-1">

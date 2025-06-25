@@ -107,6 +107,15 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
       missingFields.push('担当者メール');
     }
 
+    // メールアドレスの形式検証（他社の場合）
+    if (!isOwnCompany && formData.managerEmail && formData.managerEmail.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.managerEmail)) {
+        toast.error('正しいメールアドレス形式を入力してください');
+        return;
+      }
+    }
+
     if (missingFields.length > 0) {
       toast.error(`次の必須項目を入力してください: ${missingFields.join('、')}`);
       return;
@@ -116,8 +125,16 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
     
     try {
       if (onCreateEngineer) {
-        console.log('=== CandidateForm submitting data ===', formData);
-        const success = await onCreateEngineer(formData);
+        // 送信用データの準備
+        const submitData = {
+          ...formData,
+          source: 'manual_entry',
+          registeredAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        console.log('=== CandidateForm submitting data ===', submitData);
+        const success = await onCreateEngineer(submitData);
         if (success) {
           setFormData(initialData);
           toast.success('技術者情報を正常に登録しました');
@@ -480,8 +497,8 @@ export const CandidateFormStyled: React.FC<CandidateFormProps> = ({
                   <Label className="japanese-text font-medium text-gray-700">業務範囲</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     {[
-                      '調査・分析', '要件定義', '基本設計', '詳細設計', '製造',
-                      '単体テスト', '結合テスト', '総合テスト', '運用試験', '運用・保守'
+                      '要件定義', '基本設計', '詳細設計', '製造',
+                      '単体テスト', '結合テスト', '総合テスト', '運用保守'
                     ].map((scope) => (
                       <div key={scope} className="flex items-center space-x-2">
                         <Checkbox

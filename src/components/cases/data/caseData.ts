@@ -77,7 +77,7 @@ export const caseData: MailCase[] = [
     priority: "高",
     manager: "佐藤 太郎",
     managerEmail: "sato@technosolution.co.jp",
-    processes: ["要件定義", "設計", "実装", "テスト"],
+    processes: ["要件定義", "基本設計", "詳細設計", "製造"],
     interviewCount: "2",
     description: "金融系システムの新規開発プロジェクトにおけるJavaエンジニアの募集案件です。既存システムのリプレイス案件となります。"
   },
@@ -114,7 +114,7 @@ export const caseData: MailCase[] = [
     managerEmail: "yamada@digital-frontier.co.jp",
     foreignerAccepted: true,
     freelancerAccepted: true,
-    processes: ["設計", "実装", "テスト"],
+    processes: ["基本設計", "詳細設計", "製造", "単体テスト"],
     interviewCount: "1",
     detailDescription: `
 ECサイトのフロントエンド開発を担当するエンジニアを募集しています。
@@ -385,7 +385,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     duration: "1年（延長の可能性あり）",
     japanese: "ビジネスレベル",
     priority: "高",
-    processes: ["要件定義", "アーキテクチャ設計", "実装支援", "運用設計"],
+    processes: ["要件定義", "基本設計", "詳細設計", "運用保守"],
     interviewCount: "2",
     detailDescription: `
 大規模基幹システムのクラウド移行を担当するAWSクラウドアーキテクトを募集しています。
@@ -449,7 +449,7 @@ ECサイトのフロントエンド開発を担当するエンジニアを募集
     duration: "6ヶ月〜12ヶ月",
     japanese: "ビジネス会話レベル",
     priority: "中",
-    processes: ["設計", "実装", "テスト"],
+    processes: ["基本設計", "詳細設計", "製造", "単体テスト"],
     interviewCount: "1",
     detailDescription: `
 Webアプリケーションの開発を担当するフルスタックエンジニアを募集しています。
@@ -582,7 +582,7 @@ CI/CD環境の構築・運用を担当するDevOpsエンジニアを募集して
     duration: "6ヶ月（延長の可能性あり）",
     japanese: "日常会話レベル",
     priority: "中",
-    processes: ["設計", "実装", "テスト"],
+    processes: ["基本設計", "詳細設計", "製造", "単体テスト"],
     interviewCount: "2",
     detailDescription: `
 iOS/Androidアプリ開発を担当するモバイルアプリ開発者を募集しています。
