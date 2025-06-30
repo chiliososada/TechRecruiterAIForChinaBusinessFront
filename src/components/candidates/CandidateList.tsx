@@ -352,14 +352,14 @@ export const CandidateList: React.FC<CandidateListProps> = ({
                 {showCompanyNameFilter && (
                   <TableHead className="japanese-text">所属会社</TableHead>
                 )}
-                <TableHead className="japanese-text cursor-pointer" onClick={() => handleSort('skills')}>
+                <TableHead className="japanese-text cursor-pointer max-w-[200px]" onClick={() => handleSort('skills')}>
                   スキル {sortField === 'skills' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </TableHead>
                 <TableHead className="japanese-text cursor-pointer" onClick={() => handleSort('experience')}>
                   経験年数 {sortField === 'experience' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </TableHead>
                 <TableHead className="japanese-text">最寄駅</TableHead>
-                <TableHead className="japanese-text">備考</TableHead>
+                <TableHead className="japanese-text max-w-[150px]">備考</TableHead>
                 <TableHead className="japanese-text">ステータス</TableHead>
                 <TableHead className="japanese-text cursor-pointer" onClick={() => handleSort('registeredAt')}>
                   登録日 {sortField === 'registeredAt' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -393,8 +393,10 @@ export const CandidateList: React.FC<CandidateListProps> = ({
                     {showCompanyNameFilter && (
                       <TableCell className="japanese-text text-sm">{engineer.companyName}</TableCell>
                     )}
-                    <TableCell className="japanese-text text-sm truncate">
-                      {engineer.skills && engineer.skills.join(", ")}
+                    <TableCell className="japanese-text text-sm max-w-[200px]">
+                      <div className="truncate" title={engineer.skills && engineer.skills.join(", ")}>
+                        {engineer.skills && engineer.skills.join(", ")}
+                      </div>
                     </TableCell>
                     <TableCell className="japanese-text text-sm">{engineer.experience}</TableCell>
                     <TableCell>
@@ -403,8 +405,10 @@ export const CandidateList: React.FC<CandidateListProps> = ({
                         <span className="japanese-text text-sm">{engineer.nearestStation || '未設定'}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="japanese-text text-sm truncate">
-                      <span className="truncate">{engineer.remarks}</span>
+                    <TableCell className="japanese-text text-sm max-w-[150px]">
+                      <div className="truncate" title={engineer.remarks}>
+                        {engineer.remarks}
+                      </div>
                     </TableCell>
                     <TableCell className="japanese-text text-sm">
                       <div className="flex flex-wrap gap-1">
@@ -427,14 +431,16 @@ export const CandidateList: React.FC<CandidateListProps> = ({
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => onDownloadResume && onDownloadResume(engineer.id)}
-                          title="履歴書をダウンロード"
-                        >
-                          <FileDown className="h-4 w-4" />
-                        </Button>
+                        {engineer.resumeUrl && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => onDownloadResume && onDownloadResume(engineer.id)}
+                            title="履歴書をダウンロード"
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="sm" 

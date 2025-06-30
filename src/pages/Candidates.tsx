@@ -123,9 +123,26 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
   };
   
   // Add a function to handle resume downloads
-  const handleDownloadResume = (id: string) => {
-    console.log(`Download resume for candidate: ${id}`);
-    toast.success('履歴書のダウンロードを開始しました');
+  const handleDownloadResume = async (id: string) => {
+    const engineer = dbEngineers.find(e => e.id === id);
+    if (engineer && engineer.resume_url) {
+      try {
+        // Create a temporary anchor element to trigger download
+        const link = document.createElement('a');
+        link.href = engineer.resume_url;
+        link.download = `履歴書_${engineer.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('履歴書のダウンロードを開始しました');
+      } catch (error) {
+        console.error('Resume download error:', error);
+        toast.error('履歴書のダウンロードに失敗しました');
+      }
+    } else {
+      toast.error('履歴書ファイルが見つかりません');
+    }
   };
 
   // Handle form submission

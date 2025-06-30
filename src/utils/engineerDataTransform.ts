@@ -48,6 +48,8 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
     phone: dbEngineer.phone || '',
     managerName: dbEngineer.manager_name || '',
     managerEmail: dbEngineer.manager_email || '',
+    resumeUrl: dbEngineer.resume_url || '',
+    resumeText: dbEngineer.resume_text || '',
     registeredAt: new Date(dbEngineer.created_at).toLocaleDateString('ja-JP'),
     updatedAt: new Date(dbEngineer.updated_at).toLocaleDateString('ja-JP')
   };
