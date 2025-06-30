@@ -101,7 +101,16 @@ export const getCurrentUserInfo = () => {
     if (authDataStr) {
       const authData = JSON.parse(authDataStr);
       console.log('Found auth_user_data:', authData);
-      return authData.user || authData;
+      
+      // Combine user and tenant info for API calls
+      const userInfo = authData.user || {};
+      const tenantInfo = authData.tenant || {};
+      
+      return {
+        ...userInfo,
+        tenant_id: tenantInfo.id || userInfo.tenant_id,
+        email: userInfo.email || tenantInfo.email
+      };
     }
 
     // Fallback: try other possible storage keys
@@ -448,6 +457,159 @@ export const sendIndividualEmail = async (
     return {
       success: false,
       message: error instanceof Error ? error.message : 'メール送信に失敗しました',
+    };
+  }
+};
+
+// Resume Upload interfaces
+export interface UploadResumeParams {
+  file: File;
+  tenant_id: string;
+  engineer_id?: string;
+}
+
+export interface UploadResumeResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    file_url: string;
+    file_name: string;
+    file_size: number;
+    upload_id: string;
+    storage_path: string;
+    metadata: {
+      original_filename: string;
+      file_size: number;
+      mime_type: string;
+      tenant_id: string;
+      engineer_id?: string;
+      file_url: string;
+      storage_path: string;
+      upload_id: string;
+    };
+    extracted_text?: string;
+  };
+  error_code?: string | null;
+}
+
+// Upload resume file to storage
+export const uploadResumeFile = async (
+  file: File,
+  engineerId?: string,
+  userFromContext?: { tenant_id: string }
+): Promise<UploadResumeResponse> => {
+  try {
+    const { accessToken } = getStoredTokens();
+    const userInfo = userFromContext || getCurrentUserInfo();
+
+
+    if (!userInfo || !userInfo.tenant_id) {
+      console.error('Missing tenant info:', { userInfo, hasTenantId: !!userInfo?.tenant_id });
+      return {
+        success: false,
+        message: 'テナント情報が見つかりません',
+      };
+    }
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tenant_id', userInfo.tenant_id);
+    if (engineerId) {
+      formData.append('engineer_id', engineerId);
+    }
+
+    console.log('Uploading resume file:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      tenantId: userInfo.tenant_id,
+      engineerId: engineerId,
+    });
+
+    const response = await fetch(`${API_BASE}/resume-upload/upload`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': BACKEND_API_KEY,
+        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log('Resume upload response:', data);
+
+    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+      return {
+        success: false,
+        message: data.message || data.error || `エラー: ${response.status}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || '履歴書ファイルをアップロードしました',
+      data: data.data,
+    };
+  } catch (error) {
+    console.error('Resume file upload error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : '履歴書ファイルのアップロードに失敗しました',
+    };
+  }
+};
+
+// Delete uploaded resume file
+export const deleteUploadedFile = async (
+  fileUrl: string,
+  userFromContext?: { tenant_id: string }
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const { accessToken } = getStoredTokens();
+    const userInfo = userFromContext || getCurrentUserInfo();
+
+    if (!userInfo || !userInfo.tenant_id) {
+      return {
+        success: false,
+        message: 'テナント情報が見つかりません',
+      };
+    }
+
+    console.log('Deleting uploaded file:', fileUrl);
+
+    const response = await fetch(`${API_BASE}/resume-upload/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': BACKEND_API_KEY,
+        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+      },
+      body: JSON.stringify({
+        file_url: fileUrl,
+        tenant_id: userInfo.tenant_id,
+      }),
+    });
+
+    const data = await response.json();
+    console.log('File deletion response:', data);
+
+    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+      return {
+        success: false,
+        message: data.message || data.error || `エラー: ${response.status}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'ファイルを削除しました',
+    };
+  } catch (error) {
+    console.error('File deletion error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'ファイル削除に失敗しました',
     };
   }
 };

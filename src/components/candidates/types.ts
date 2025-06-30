@@ -28,6 +28,8 @@ export interface Engineer {
   workExperience?: string; // New field (finance, insurance, etc.)
   managerName?: string; // 担当者名
   managerEmail?: string; // 担当者メール
+  resumeUrl?: string; // 履歴書ファイルURL
+  resumeText?: string; // 履歴書テキスト内容
   registeredAt: string;
   updatedAt: string;
 }
@@ -75,6 +77,8 @@ export interface NewEngineerType {
   phone: string;
   managerName: string; // 担当者名
   managerEmail: string; // 担当者メール
+  resumeUrl?: string; // 履歴書ファイルURL
+  resumeText?: string; // 履歴書テキスト内容
   registeredAt: string;
   updatedAt: string;
 }

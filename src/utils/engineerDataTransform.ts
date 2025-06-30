@@ -95,7 +95,9 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     email: emptyStringToNull(uiEngineer.email),
     phone: emptyStringToNull(uiEngineer.phone),
     manager_name: emptyStringToNull(uiEngineer.managerName),
-    manager_email: emptyStringToNull(uiEngineer.managerEmail)
+    manager_email: emptyStringToNull(uiEngineer.managerEmail),
+    resume_url: emptyStringToNull(uiEngineer.resumeUrl),
+    resume_text: emptyStringToNull(uiEngineer.resumeText)
   };
   
   console.log('=== transformUIToDatabaseEngineer Output ===', transformedData);

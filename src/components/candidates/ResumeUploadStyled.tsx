@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadResumeFile } from '@/utils/backend-api';
 
 interface ResumeUploadProps {
   onCreateEngineer?: (data: any) => Promise<boolean>;
@@ -308,6 +309,34 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
     }
 
     try {
+      let resumeUrl = '';
+      let resumeText = '';
+      
+      
+      // ファイルがある場合、まず履歴書ファイルをアップロード
+      if (uploadedFile) {
+        toast.info('履歴書ファイルをアップロード中...');
+        const uploadResult = await uploadResumeFile(uploadedFile);
+        
+        if (uploadResult.success && uploadResult.data) {
+          resumeUrl = uploadResult.data.file_url || '';
+          resumeText = uploadResult.data.extracted_text || '';
+          console.log('履歴書ファイルアップロード成功:', {
+            url: resumeUrl,
+            textLength: resumeText.length
+          });
+          toast.success('履歴書ファイルのアップロードが完了しました');
+        } else {
+          console.error('履歴書ファイルアップロード失敗:', uploadResult.message);
+          toast.warning('履歴書ファイルのアップロードに失敗しました');
+        }
+      }
+      
+      // 解析されたデータから履歴書テキストを取得（ファイルアップロードで取得できなかった場合）
+      if (!resumeText && parsedData) {
+        resumeText = JSON.stringify(parsedData.data || parsedData, null, 2);
+      }
+      
       const formData = {
         name: candidateData.name,
         skills: candidateData.skills,
@@ -334,6 +363,8 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         source: 'resume_upload',
         email: '',
         phone: '',
+        resumeUrl: resumeUrl,
+        resumeText: resumeText,
         registeredAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
