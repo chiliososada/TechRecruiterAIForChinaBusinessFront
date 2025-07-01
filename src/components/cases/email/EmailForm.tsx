@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EmailTemplate } from './types';
+import { EmailTemplate } from './hooks/useEmailTemplates';
 import { MailCheck, Send, Sparkles, MailPlus, Pencil, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EmailFormProps {
   emailTemplates: EmailTemplate[];
+  templatesLoading?: boolean;
   selectedTemplate: string;
   handleTemplateChange: (templateId: string) => void;
   subject: string;
@@ -30,6 +31,7 @@ interface EmailFormProps {
 
 export function EmailForm({
   emailTemplates,
+  templatesLoading = false,
   selectedTemplate,
   handleTemplateChange,
   subject,
@@ -104,15 +106,18 @@ export function EmailForm({
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label htmlFor="email-template" className="japanese-text">テンプレート選択</Label>
+                {templatesLoading && (
+                  <span className="text-xs text-muted-foreground">読み込み中...</span>
+                )}
               </div>
-              <Select value={safeSelectedTemplate} onValueChange={handleTemplateChange}>
+              <Select value={safeSelectedTemplate} onValueChange={handleTemplateChange} disabled={templatesLoading}>
                 <SelectTrigger className="japanese-text">
-                  <SelectValue placeholder="テンプレートを選択" />
+                  <SelectValue placeholder={templatesLoading ? "テンプレートを読み込み中..." : "テンプレートを選択"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="no-template">テンプレートなし</SelectItem>
                   {emailTemplates.map(template => (
-                    <SelectItem key={template.id} value={template.id || `template-${template.id}`}>
+                    <SelectItem key={template.id} value={template.id}>
                       {template.name}
                     </SelectItem>
                   ))}

@@ -2,7 +2,7 @@
 import React from 'react';
 import { EmailForm } from './EmailForm';
 import { EngineerSelection } from './EngineerSelection';
-import { EMAIL_TEMPLATES } from './types';
+import { EmailTemplate } from './hooks/useEmailTemplates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { X, UsersRound } from 'lucide-react';
@@ -25,6 +25,8 @@ interface EmailSenderLayoutProps {
   engineerState: {
     selectedEngineers: any[];
   };
+  templates: EmailTemplate[];
+  templatesLoading: boolean;
   handleTemplateChange: (templateId: string) => void;
   handleEnhanceEmail: () => void;
   handleSendEmail: () => void;
@@ -39,6 +41,8 @@ interface EmailSenderLayoutProps {
 export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
   emailState,
   engineerState,
+  templates,
+  templatesLoading,
   handleTemplateChange,
   handleEnhanceEmail,
   handleSendEmail,
@@ -158,7 +162,8 @@ export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
       <div className="lg:col-span-2">
         <EmailForm
           key="email-form-compose" // Force re-render to ensure compose tab is active
-          emailTemplates={EMAIL_TEMPLATES}
+          emailTemplates={templates}
+          templatesLoading={templatesLoading}
           selectedTemplate={emailState.selectedTemplate}
           handleTemplateChange={handleTemplateChange}
           subject={emailState.subject}

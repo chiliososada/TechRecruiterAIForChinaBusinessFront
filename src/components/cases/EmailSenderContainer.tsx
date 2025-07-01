@@ -3,12 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { EmailSenderContent } from './email/EmailSenderContent';
 import { useEmailState } from './email/hooks/useEmailState';
 import { useEngineerState } from './email/hooks/useEngineerState';
+import { useBulkEmailTemplates } from './email/hooks/useEmailTemplates';
+import { applyTemplateWithEngineers } from './email/utils/templateProcessor';
 import { toast } from 'sonner';
 import { EngineerSelectionDialog } from './email/EngineerSelectionDialog';
 import { processCaseData } from './email/utils/dataProcessing';
 import { MailCase } from './email/types';
 import { sendTestEmail, sendIndividualEmail } from '@/utils/backend-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { emailTemplateService } from '@/services/emailTemplateService';
 
 interface EmailSenderContainerProps {
   mailCases: MailCase[];  // This receives filtered cases from the parent component
@@ -18,7 +21,8 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   // Use custom hooks
   const emailState = useEmailState(mailCases); 
   const engineerState = useEngineerState(mailCases);
-  const { user } = useAuth();
+  const { templates, loading: templatesLoading, error: templatesError } = useBulkEmailTemplates();
+  const { user, currentTenant } = useAuth();
   
   // State for sorting
   const [sortField, setSortField] = useState<string | null>(null);
@@ -189,20 +193,43 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
     }
   };
   
-  const handleTemplateChange = (templateId: string) => {
+  const handleTemplateChange = async (templateId: string) => {
     emailState.setSelectedTemplate(templateId);
     
-    // Apply template logic here...
-    // This is simplified; actual implementation would use proper template functions
-    if (templateId === 'template-1') {
-      emailState.setSubject('案件のご紹介');
-      emailState.setEmailBody('いつもお世話になっております。\n\n新しい案件のご紹介です。\n\nご検討いただければ幸いです。');
-    } else if (templateId === 'template-2') {
-      emailState.setSubject('技術者のご提案');
-      emailState.setEmailBody('いつもお世話になっております。\n\n技術者のご提案です。\n\nどうぞご検討ください。');
-    } else {
+    if (templateId === 'no-template') {
       emailState.setSubject('');
       emailState.setEmailBody('');
+      emailState.setSignature('');
+      return;
+    }
+    
+    // Find the selected template
+    const selectedTemplate = templates.find(t => t.id === templateId);
+    if (!selectedTemplate) {
+      console.warn('Template not found:', templateId);
+      return;
+    }
+
+    try {
+      // Apply template with current engineers (if any)
+      const { subject, body, signature } = applyTemplateWithEngineers(
+        selectedTemplate,
+        engineerState.selectedEngineers
+      );
+      
+      emailState.setSubject(subject);
+      emailState.setEmailBody(body);
+      emailState.setSignature(signature);
+      
+      // Update template usage count
+      if (currentTenant?.id) {
+        await emailTemplateService.incrementUsageCount(templateId, currentTenant.id);
+      }
+      
+      toast.success('テンプレートを適用しました');
+    } catch (error) {
+      console.error('Template application error:', error);
+      toast.error('テンプレートの適用に失敗しました');
     }
   };
   
@@ -336,8 +363,35 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   
   // Modified to match the expected signature in EmailSenderContent
   const engineerHandleApply = () => {
-    // We call engineerState.engineerHandleApply with the required parameters
-    engineerState.engineerHandleApply(emailState.emailBody, emailState.setEmailBody);
+    if (engineerState.selectedEngineers.length === 0) {
+      toast.error('技術者が選択されていません');
+      return;
+    }
+
+    // Check if we have a template selected
+    const selectedTemplate = templates.find(t => t.id === emailState.selectedTemplate);
+    
+    if (selectedTemplate) {
+      // Use template with engineer data
+      try {
+        const { subject, body, signature } = applyTemplateWithEngineers(
+          selectedTemplate,
+          engineerState.selectedEngineers
+        );
+        
+        emailState.setSubject(subject);
+        emailState.setEmailBody(body);
+        emailState.setSignature(signature);
+        
+        toast.success('技術者情報をテンプレートに適用しました');
+      } catch (error) {
+        console.error('Template application error:', error);
+        toast.error('技術者情報の適用に失敗しました');
+      }
+    } else {
+      // Fallback to old behavior if no template is selected
+      engineerState.engineerHandleApply(emailState.emailBody, emailState.setEmailBody);
+    }
   };
   
   // Combined handlers
@@ -370,6 +424,8 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
           totalPages,
           companyList
         }}
+        templates={templates}
+        templatesLoading={templatesLoading}
         handlers={handlers}
       />
       

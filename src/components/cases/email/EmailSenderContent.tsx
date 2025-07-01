@@ -12,6 +12,7 @@ import { CasesList } from './CasesList';
 import { EmailSenderLayout } from './EmailSenderLayout';
 import { FilterBar } from './FilterBar';
 import { MailCase } from './types';
+import { EmailTemplate } from './hooks/useEmailTemplates';
 import { Input } from '@/components/ui/input';
 import { Search, Building } from 'lucide-react';
 import { CaseViewDialog } from '../detail/CaseViewDialog';
@@ -49,6 +50,8 @@ interface EmailSenderContentProps {
     totalPages: number;
     companyList: (string | null)[];
   };
+  templates: EmailTemplate[];
+  templatesLoading: boolean;
   handlers: {
     casesHandleSelectAll: () => void;
     casesHandleSelectCase: (id: string, rowId: string) => void;
@@ -69,6 +72,8 @@ export const EmailSenderContent: React.FC<EmailSenderContentProps> = ({
   emailState,
   engineerState,
   caseData,
+  templates,
+  templatesLoading,
   handlers
 }) => {
   const [companySearchTerm, setCompanySearchTerm] = React.useState('');
@@ -186,6 +191,8 @@ export const EmailSenderContent: React.FC<EmailSenderContentProps> = ({
           <EmailSenderLayout
             emailState={emailState}
             engineerState={engineerState}
+            templates={templates}
+            templatesLoading={templatesLoading}
             handleTemplateChange={handlers.templateHandleChange}
             handleEnhanceEmail={handlers.emailHandleEnhance}
             handleSendEmail={handlers.emailHandleSend}
