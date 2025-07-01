@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsWithContext } from '@/components/ui/tabs';
 import { CandidateList } from '@/components/candidates/CandidateList';
@@ -76,6 +76,14 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   // Add state for modal visibility and selected engineer
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
+  
+  // Debug selectedEngineer changes
+  useEffect(() => {
+    console.log('=== selectedEngineer state changed ===');
+    console.log('New selectedEngineer nearestStation:', selectedEngineer?.nearestStation);
+    console.log('Full selectedEngineer:', selectedEngineer);
+  }, [selectedEngineer]);
+
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
