@@ -176,18 +176,28 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     console.log('Full engineer object:', engineer);
     setSelectedEngineer(engineer);
     console.log('Updated engineer:', engineer);
+    
+    // Check selectedEngineer state after a small delay
+    setTimeout(() => {
+      console.log('=== selectedEngineer after setState (async check) ===');
+      console.log('selectedEngineer.nearestStation:', selectedEngineer?.nearestStation);
+    }, 100);
   };
 
-  const handleSaveEdit = async () => {
-    if (selectedEngineer) {
-      console.log('=== handleSaveEdit - selectedEngineer ===');
-      console.log('nearestStation:', selectedEngineer.nearestStation);
-      console.log('Full engineer data:', selectedEngineer);
+  const handleSaveEdit = async (engineerToSave?: Engineer) => {
+    // Use the engineerToSave parameter if provided, otherwise fall back to selectedEngineer
+    const engineerData = engineerToSave || selectedEngineer;
+    
+    if (engineerData) {
+      console.log('=== handleSaveEdit - engineerData ===');
+      console.log('nearestStation:', engineerData.nearestStation);
+      console.log('Full engineer data:', engineerData);
+      console.log('Source:', engineerToSave ? 'localEngineer (direct)' : 'selectedEngineer (fallback)');
       
-      const transformedData = transformUIToDatabaseEngineer(selectedEngineer);
+      const transformedData = transformUIToDatabaseEngineer(engineerData);
       console.log('Transformed data nearest_station:', transformedData.nearest_station);
       
-      const success = await updateEngineer(selectedEngineer.id, transformedData);
+      const success = await updateEngineer(engineerData.id, transformedData);
       if (success) {
         setIsEditOpen(false);
       }

@@ -15,7 +15,7 @@ interface CandidateEditProps {
   onOpenChange: (open: boolean) => void;
   engineer: Engineer | null;
   onEngineerChange: (engineer: Engineer) => void;
-  onSave: () => void;
+  onSave: (engineer?: Engineer) => void;
   isOwnCompany: boolean;
 }
 
@@ -100,7 +100,8 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
       console.log('Saving engineer with nearestStation:', localEngineer.nearestStation);
       console.log('Full engineer data:', localEngineer);
       onEngineerChange(localEngineer);
-      onSave();
+      // Pass localEngineer directly to the save callback instead of relying on selectedEngineer
+      onSave(localEngineer);
     }
   };
 
