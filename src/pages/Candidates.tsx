@@ -163,6 +163,9 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   // Handle engineer edit
   const handleEngineerChange = (engineer: Engineer) => {
+    console.log('=== handleEngineerChange ===');
+    console.log('engineer.nearestStation:', engineer.nearestStation);
+    console.log('Full engineer object:', engineer);
     setSelectedEngineer(engineer);
     console.log('Updated engineer:', engineer);
   };

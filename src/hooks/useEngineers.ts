@@ -207,7 +207,10 @@ export const useEngineers = (companyType: 'own' | 'other') => {
     }
 
     try {
-      console.log('Updating engineer with data:', engineerData);
+      console.log('=== useEngineers.updateEngineer START ===');
+      console.log('Engineer ID:', id);
+      console.log('Input engineerData:', engineerData);
+      console.log('engineerData.nearest_station:', engineerData.nearest_station);
 
       // 处理状态值 - 确保使用正确的数据库状态值
       let dbStatus = '提案中'; // 默认状态
@@ -257,16 +260,27 @@ export const useEngineers = (companyType: 'own' | 'other') => {
         updated_at: new Date().toISOString()
       };
 
+      console.log('=== Final data being sent to database ===');
+      console.log('updatedEngineer.nearest_station:', updatedEngineer.nearest_station);
       console.log('Processed engineer data for update:', updatedEngineer);
 
       await businessClientManager.executeWithRetry(async () => {
         const client = businessClientManager.getClient();
-        const { error } = await client
+        console.log('=== About to execute database update ===');
+        console.log('Updating engineer ID:', id);
+        console.log('Tenant ID:', currentTenant.id);
+        
+        const { data, error } = await client
           .from('engineers')
           .update(updatedEngineer)
           .eq('id', id)
-          .eq('tenant_id', currentTenant.id);
+          .eq('tenant_id', currentTenant.id)
+          .select(); // Add select to see what was actually updated
 
+        console.log('=== Database update result ===');
+        console.log('Updated data:', data);
+        console.log('Error:', error);
+        
         if (error) throw error;
       });
 
