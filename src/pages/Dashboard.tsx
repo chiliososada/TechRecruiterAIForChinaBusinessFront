@@ -115,15 +115,37 @@ export function Dashboard() {
   const recentProjectsCount = recentCases.filter(c => c.daysAgo <= 7).length;
   const recentEngineersCount = recentCandidates.filter(c => c.daysAgo <= 7).length;
   
-  // チャート用データの計算
-  const chartData = [
-    { month: '1月', projects: Math.floor(totalProjects * 0.1), engineers: Math.floor(totalEngineers * 0.1) },
-    { month: '2月', projects: Math.floor(totalProjects * 0.15), engineers: Math.floor(totalEngineers * 0.15) },
-    { month: '3月', projects: Math.floor(totalProjects * 0.2), engineers: Math.floor(totalEngineers * 0.18) },
-    { month: '4月', projects: Math.floor(totalProjects * 0.25), engineers: Math.floor(totalEngineers * 0.22) },
-    { month: '5月', projects: Math.floor(totalProjects * 0.3), engineers: Math.floor(totalEngineers * 0.35) },
-    { month: '今月', projects: totalProjects, engineers: totalEngineers },
-  ];
+  // 実際のデータに基づく年間月別統計を計算
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-based (0=1月, 11=12月)
+  
+  const getMonthlyData = () => {
+    const monthlyStats = Array.from({ length: 12 }, (_, index) => {
+      const monthName = `${index + 1}月`;
+      
+      // 該当月のプロジェクト数を計算
+      const monthProjects = projects.filter(project => {
+        const projectDate = new Date(project.created_at);
+        return projectDate.getFullYear() === currentYear && projectDate.getMonth() === index;
+      }).length;
+      
+      // 該当月のエンジニア数を計算  
+      const monthEngineers = allEngineers.filter(engineer => {
+        const engineerDate = new Date(engineer.created_at);
+        return engineerDate.getFullYear() === currentYear && engineerDate.getMonth() === index;
+      }).length;
+      
+      return {
+        month: monthName,
+        projects: monthProjects,
+        engineers: monthEngineers
+      };
+    });
+    
+    return monthlyStats;
+  };
+  
+  const chartData = getMonthlyData();
   
   const pieData = [
     { name: '自社エンジニア', value: ownEngineersCount, color: '#0088FE' },
@@ -175,14 +197,25 @@ export function Dashboard() {
     ));
   };
 
-  // 実データに基づく月度案件趋势（仮想的な月別分布）
-  const monthlyData = [
-    { name: '1月', 案件数: Math.floor(totalProjects * 0.1) },
-    { name: '2月', 案件数: Math.floor(totalProjects * 0.15) },
-    { name: '3月', 案件数: Math.floor(totalProjects * 0.2) },
-    { name: '4月', 案件数: Math.floor(totalProjects * 0.25) },
-    { name: '5月', 案件数: Math.floor(totalProjects * 0.3) },
-  ];
+  // 実データに基づく年間案件趋势を計算
+  const getMonthlyProjectData = () => {
+    return Array.from({ length: 12 }, (_, index) => {
+      const monthName = `${index + 1}月`;
+      
+      // 該当月の案件数を計算
+      const monthProjectCount = projects.filter(project => {
+        const projectDate = new Date(project.created_at);
+        return projectDate.getFullYear() === currentYear && projectDate.getMonth() === index;
+      }).length;
+      
+      return {
+        name: monthName,
+        案件数: monthProjectCount
+      };
+    });
+  };
+  
+  const monthlyData = getMonthlyProjectData();
 
   // 実データから技術スキル分布を計算
   const skillCounts = new Map();
