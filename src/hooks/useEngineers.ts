@@ -253,6 +253,7 @@ export const useEngineers = (companyType: 'own' | 'other') => {
         phone: engineerData.phone === '' ? null : engineerData.phone,
         manager_name: engineerData.manager_name === '' ? null : engineerData.manager_name,
         manager_email: engineerData.manager_email === '' ? null : engineerData.manager_email,
+        recommendation: engineerData.recommendation === '' ? null : engineerData.recommendation,
         updated_at: new Date().toISOString()
       };
 

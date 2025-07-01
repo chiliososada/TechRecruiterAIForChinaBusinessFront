@@ -56,11 +56,14 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
   if (!localEngineer) return null;
 
   const handleChange = (field: keyof Engineer, value: any) => {
+    console.log(`Updating field ${field} with value:`, value);
     setLocalEngineer({ ...localEngineer, [field]: value });
   };
 
   const handleSave = () => {
     if (localEngineer) {
+      console.log('Saving engineer with nearestStation:', localEngineer.nearestStation);
+      console.log('Full engineer data:', localEngineer);
       onEngineerChange(localEngineer);
       onSave();
     }

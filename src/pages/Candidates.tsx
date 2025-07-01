@@ -169,7 +169,13 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   const handleSaveEdit = async () => {
     if (selectedEngineer) {
+      console.log('=== handleSaveEdit - selectedEngineer ===');
+      console.log('nearestStation:', selectedEngineer.nearestStation);
+      console.log('Full engineer data:', selectedEngineer);
+      
       const transformedData = transformUIToDatabaseEngineer(selectedEngineer);
+      console.log('Transformed data nearest_station:', transformedData.nearest_station);
+      
       const success = await updateEngineer(selectedEngineer.id, transformedData);
       if (success) {
         setIsEditOpen(false);

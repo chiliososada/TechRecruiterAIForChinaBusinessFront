@@ -50,6 +50,7 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
     managerEmail: dbEngineer.manager_email || '',
     resumeUrl: dbEngineer.resume_url || '',
     resumeText: dbEngineer.resume_text || '',
+    recommendation: dbEngineer.recommendation || '',
     registeredAt: new Date(dbEngineer.created_at).toLocaleDateString('ja-JP'),
     updatedAt: new Date(dbEngineer.updated_at).toLocaleDateString('ja-JP')
   };
@@ -99,7 +100,8 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     manager_name: emptyStringToNull(uiEngineer.managerName),
     manager_email: emptyStringToNull(uiEngineer.managerEmail),
     resume_url: emptyStringToNull(uiEngineer.resumeUrl),
-    resume_text: emptyStringToNull(uiEngineer.resumeText)
+    resume_text: emptyStringToNull(uiEngineer.resumeText),
+    recommendation: emptyStringToNull(uiEngineer.recommendation)
   };
   
   console.log('=== transformUIToDatabaseEngineer Output ===', transformedData);
