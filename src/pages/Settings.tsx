@@ -6,10 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { EmailTemplateSettings } from '@/components/settings/EmailTemplateSettings';
 
 export function Settings() {
   const { currentTenant } = useAuth();
@@ -130,7 +130,7 @@ export function Settings() {
                   
                   <div className="space-y-2">
                     <Label htmlFor="api-key" className="japanese-text">APIキー</Label>
-                    <Input id="api-key" type="password" value="sk-••••••••••••••••••••••••" />
+                    <Input id="api-key" type="password" defaultValue="sk-••••••••••••••••••••••••" />
                     <p className="text-xs text-muted-foreground japanese-text">
                       外部AIサービスのAPIキーを設定します（オプション）
                     </p>
@@ -142,47 +142,7 @@ export function Settings() {
           </TabsContent>
           
           <TabsContent value="templates" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="japanese-text">テンプレート設定</CardTitle>
-                <CardDescription className="japanese-text">
-                  自動生成されるテキストのテンプレートを設定します
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="recommendation-template" className="japanese-text">推薦文テンプレート</Label>
-                  <Textarea 
-                    id="recommendation-template" 
-                    className="min-h-[120px] japanese-text"
-                    defaultValue="{name}さんは{primarySkill}を中心に{experienceYears}年以上の開発経験があり、日本語は{japaneseLevel}です。{industry}系のプロジェクトに強みがあります。希望条件は{location}で、単価は{salary}です。"
-                  />
-                  <p className="text-sm text-muted-foreground japanese-text">
-                    {'{変数名}'} の形式で変数を使用できます
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email-template" className="japanese-text">案件案内メールテンプレート</Label>
-                  <Textarea 
-                    id="email-template" 
-                    className="min-h-[120px] japanese-text"
-                    defaultValue="お世話になっております。
-新規案件のご紹介です。
-
-【案件名】{title}
-【必須スキル】{skills}
-【勤務地】{location}
-【単価】{budget}
-【期間】{duration}
-
-ご検討のほど、よろしくお願いいたします。"
-                  />
-                </div>
-                
-                <Button className="w-full japanese-text">テンプレートを保存</Button>
-              </CardContent>
-            </Card>
+            <EmailTemplateSettings />
           </TabsContent>
         </Tabs>
       </div>
