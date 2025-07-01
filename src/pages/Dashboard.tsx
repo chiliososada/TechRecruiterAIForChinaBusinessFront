@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Users, ArrowRight, Mail, BarChart3, PieChart, Activity, TrendingUp } from 'lucide-react';
+import { FileText, Users, ArrowRight, Mail, BarChart3, PieChart, Activity, TrendingUp, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useProjects } from '@/hooks/useProjects';
+import { useEngineers } from '@/hooks/useEngineers';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   ChartContainer, 
   ChartLegend, 
@@ -15,33 +18,64 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 
 export function Dashboard() {
   const { toast } = useToast();
+  const { currentTenant, loading: authLoading } = useAuth();
+  
+  // データベースから実データを取得
+  const { projects, loading: projectsLoading } = useProjects();
+  const { engineers: ownEngineers, loading: ownEngineersLoading, error: ownEngineersError } = useEngineers('own');
+  const { engineers: otherEngineers, loading: otherEngineersLoading, error: otherEngineersError } = useEngineers('other');
+  
+  // 全エンジニアを結合
+  const allEngineers = [...ownEngineers, ...otherEngineers];
+  
+  // ローディング状態
+  const isLoading = authLoading || projectsLoading || ownEngineersLoading || otherEngineersLoading;
+  
+  // エラー状態
+  const hasError = ownEngineersError || otherEngineersError;
   
   // 展示欢迎消息
-  React.useEffect(() => {
-    toast({
-      title: "ダッシュボードへようこそ",
-      description: "最新の案件と候補者のデータをご確認いただけます。",
-    });
-  }, []);
+  useEffect(() => {
+    if (!isLoading && !hasError) {
+      toast({
+        title: "ダッシュボードへようこそ",
+        description: "最新の案件と候補者のデータをご確認いただけます。",
+      });
+    }
+  }, [isLoading, hasError, toast]);
 
-  // 案件数据
-  const recentCases = [
-    { id: 1, title: 'Java開発エンジニア', company: '株式会社テクノロジー', location: '東京', postedAt: '2025-05-14', source: 'mail', daysAgo: 0 },
-    { id: 2, title: 'フロントエンドエンジニア', company: 'デジタルソリューションズ', location: '大阪', postedAt: '2025-05-13', source: 'manual', daysAgo: 1 },
-    { id: 3, title: 'インフラエンジニア', company: 'クラウドシステムズ', location: '名古屋', postedAt: '2025-05-12', source: 'mail', daysAgo: 2 },
-    { id: 4, title: 'QAエンジニア', company: 'テストシステム株式会社', location: 'リモート', postedAt: '2025-05-11', source: 'manual', daysAgo: 3 },
-    { id: 5, title: 'PHP開発エンジニア', company: 'ウェブシステム株式会社', location: '東京', postedAt: '2025-05-09', source: 'mail', daysAgo: 5 },
-    { id: 6, title: 'Python開発者', company: 'AIソリューション', location: '福岡', postedAt: '2025-05-07', source: 'manual', daysAgo: 7 },
-  ];
+  // 実際の案件データを変換
+  const recentCases = projects.slice(0, 6).map(project => {
+    const createdAt = new Date(project.created_at);
+    const now = new Date();
+    const daysAgo = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return {
+      id: project.id,
+      title: project.title,
+      company: project.client_company || '未設定',
+      location: project.location || '未設定',
+      postedAt: createdAt.toLocaleDateString('ja-JP'),
+      source: project.source === 'manual_entry' ? 'manual' : 'mail',
+      daysAgo
+    };
+  });
 
-  // 候補者数据
-  const recentCandidates = [
-    { id: 1, name: '鈴木太郎', skills: 'Java, Spring Boot, AWS', experience: '7年', lastUpdated: '2025-05-14', daysAgo: 0 },
-    { id: 2, name: '田中花子', skills: 'React, TypeScript, Node.js', experience: '5年', lastUpdated: '2025-05-12', daysAgo: 2 },
-    { id: 3, name: '佐藤一郎', skills: 'Python, Django, Docker', experience: '3年', lastUpdated: '2025-05-11', daysAgo: 3 },
-    { id: 4, name: '山田次郎', skills: 'C#, .NET, Azure', experience: '8年', lastUpdated: '2025-05-08', daysAgo: 6 },
-    { id: 5, name: '伊藤三郎', skills: 'PHP, Laravel, MySQL', experience: '4年', lastUpdated: '2025-05-07', daysAgo: 7 },
-  ];
+  // 実際の候補者データを変換
+  const recentCandidates = allEngineers.slice(0, 5).map(engineer => {
+    const updatedAt = new Date(engineer.updated_at);
+    const now = new Date();
+    const daysAgo = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return {
+      id: engineer.id,
+      name: engineer.name,
+      skills: Array.isArray(engineer.skills) ? engineer.skills.join(', ') : engineer.skills || '未設定',
+      experience: engineer.experience || '未設定',
+      lastUpdated: updatedAt.toLocaleDateString('ja-JP'),
+      daysAgo
+    };
+  });
 
   // 按时间过滤案件
   const getFilteredCases = (days: number, source?: string) => {
@@ -66,6 +100,35 @@ export function Dashboard() {
   // 获取特定时间段的候选人数据
   const last3DaysCandidates = getFilteredCandidates(3);
   const lastWeekCandidates = getFilteredCandidates(7);
+
+  // 実データに基づく統計計算
+  const totalProjects = projects.length;
+  const totalEngineers = allEngineers.length;
+  const ownEngineersCount = ownEngineers.length;
+  const otherEngineersCount = otherEngineers.length;
+  
+  // 案件のステータス別統計
+  const activeProjects = projects.filter(p => p.status === '募集中').length;
+  const completedProjects = projects.filter(p => p.status === '完了').length;
+  
+  // 最近の活動統計
+  const recentProjectsCount = recentCases.filter(c => c.daysAgo <= 7).length;
+  const recentEngineersCount = recentCandidates.filter(c => c.daysAgo <= 7).length;
+  
+  // チャート用データの計算
+  const chartData = [
+    { month: '1月', projects: Math.floor(totalProjects * 0.1), engineers: Math.floor(totalEngineers * 0.1) },
+    { month: '2月', projects: Math.floor(totalProjects * 0.15), engineers: Math.floor(totalEngineers * 0.15) },
+    { month: '3月', projects: Math.floor(totalProjects * 0.2), engineers: Math.floor(totalEngineers * 0.18) },
+    { month: '4月', projects: Math.floor(totalProjects * 0.25), engineers: Math.floor(totalEngineers * 0.22) },
+    { month: '5月', projects: Math.floor(totalProjects * 0.3), engineers: Math.floor(totalEngineers * 0.35) },
+    { month: '今月', projects: totalProjects, engineers: totalEngineers },
+  ];
+  
+  const pieData = [
+    { name: '自社エンジニア', value: ownEngineersCount, color: '#0088FE' },
+    { name: '他社エンジニア', value: otherEngineersCount, color: '#00C49F' },
+  ];
 
   // 渲染案件列表项
   const renderCaseItems = (items: typeof recentCases) => {
@@ -112,34 +175,80 @@ export function Dashboard() {
     ));
   };
 
-  // 图表数据 - 月度案件趋势
+  // 実データに基づく月度案件趋势（仮想的な月別分布）
   const monthlyData = [
-    { name: '1月', 案件数: 4 },
-    { name: '2月', 案件数: 6 },
-    { name: '3月', 案件数: 8 },
-    { name: '4月', 案件数: 7 },
-    { name: '5月', 案件数: 12 },
+    { name: '1月', 案件数: Math.floor(totalProjects * 0.1) },
+    { name: '2月', 案件数: Math.floor(totalProjects * 0.15) },
+    { name: '3月', 案件数: Math.floor(totalProjects * 0.2) },
+    { name: '4月', 案件数: Math.floor(totalProjects * 0.25) },
+    { name: '5月', 案件数: Math.floor(totalProjects * 0.3) },
   ];
 
-  // 技能分布图表数据
-  const skillsData = [
-    { name: 'Java', value: 25 },
-    { name: 'JavaScript', value: 20 },
-    { name: 'Python', value: 18 },
-    { name: 'C#', value: 15 },
-    { name: 'PHP', value: 12 },
-  ];
+  // 実データから技術スキル分布を計算
+  const skillCounts = new Map();
+  allEngineers.forEach(engineer => {
+    const skills = Array.isArray(engineer.skills) ? engineer.skills : [];
+    skills.forEach(skill => {
+      const trimmedSkill = skill.trim();
+      if (trimmedSkill) {
+        skillCounts.set(trimmedSkill, (skillCounts.get(trimmedSkill) || 0) + 1);
+      }
+    });
+  });
+  
+  const skillsData = Array.from(skillCounts.entries())
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([name, value]) => ({ name, value }));
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-  // 地域分布图表数据
-  const locationData = [
-    { name: '東京', 案件数: 18 },
-    { name: '大阪', 案件数: 8 },
-    { name: '名古屋', 案件数: 6 },
-    { name: '福岡', 案件数: 5 },
-    { name: 'その他', 案件数: 5 },
-  ];
+  // 実データから地域分布を計算
+  const locationCounts = new Map();
+  projects.forEach(project => {
+    const location = project.location || 'その他';
+    locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
+  });
+  
+  const locationData = Array.from(locationCounts.entries())
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([name, value]) => ({ name, 案件数: value }));
+
+  // ローディング表示
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-[50vh]">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm text-muted-foreground japanese-text">
+              ダッシュボードデータを読み込んでいます...
+            </p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // エラー表示
+  if (hasError) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-[50vh]">
+          <div className="text-center space-y-4">
+            <p className="text-red-600 japanese-text">データの読み込みでエラーが発生しました</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="japanese-text"
+            >
+              再読み込み
+            </Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -167,31 +276,31 @@ export function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard 
             title="全案件数" 
-            value="42"
-            description="先月比 +12%" 
+            value={totalProjects.toString()}
+            description={activeProjects > 0 ? `有効案件: ${activeProjects}件` : '有効案件なし'} 
             icon={<FileText className="h-4 w-4" />}
             className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
           />
           <StatsCard 
             title="現在の有効案件" 
-            value="18"
-            description="先週比 +3" 
+            value={activeProjects.toString()}
+            description={completedProjects > 0 ? `完了済み: ${completedProjects}件` : '完了済みなし'} 
             icon={<Activity className="h-4 w-4" />}
             className="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
           />
           <StatsCard 
             title="候補者データベース" 
-            value="156"
-            description="新規: 今週 +5" 
+            value={totalEngineers.toString()}
+            description={`自社: ${ownEngineersCount}名 | 他社: ${otherEngineersCount}名`} 
             icon={<Users className="h-4 w-4" />}
-            className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+            className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200"
           />
           <StatsCard 
-            title="マッチング成功率" 
-            value="67%"
-            description="先月比 +5%" 
+            title="今週の新規" 
+            value={`${recentProjectsCount + recentEngineersCount}`}
+            description={`案件: ${recentProjectsCount}件 | 候補者: ${recentEngineersCount}名`} 
             icon={<TrendingUp className="h-4 w-4" />}
-            className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+            className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
           />
         </div>
 
