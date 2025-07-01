@@ -58,16 +58,6 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
 
 // 将UI engineer转换为数据库格式
 export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
-  console.log('=== transformUIToDatabaseEngineer Input ===', uiEngineer);
-  console.log('=== nearestStation Field Check ===', {
-    nearestStation: uiEngineer.nearestStation,
-    typeof: typeof uiEngineer.nearestStation,
-    hasProperty: 'nearestStation' in uiEngineer
-  });
-  console.log('=== Manager Fields Check ===', {
-    managerName: uiEngineer.managerName,
-    managerEmail: uiEngineer.managerEmail
-  });
   
   // 处理状态值 - 确保使用正确的数据库状态值
   let dbStatus = '提案中'; // 默认状态
@@ -96,14 +86,7 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     nationality: emptyStringToNull(uiEngineer.nationality),
     age: emptyStringToNull(uiEngineer.age),
     gender: emptyStringToNull(uiEngineer.gender),
-    nearest_station: (() => {
-      const result = emptyStringToNull(uiEngineer.nearestStation);
-      console.log('=== nearest_station transformation ===', {
-        input: uiEngineer.nearestStation,
-        output: result
-      });
-      return result;
-    })(),
+    nearest_station: emptyStringToNull(uiEngineer.nearestStation),
     education: emptyStringToNull(uiEngineer.education),
     arrival_year_japan: emptyStringToNull(uiEngineer.arrivalYear),
     certifications: ensureArray(uiEngineer.certifications),
@@ -116,6 +99,5 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     recommendation: emptyStringToNull(uiEngineer.recommendation)
   };
   
-  console.log('=== transformUIToDatabaseEngineer Output ===', transformedData);
   return transformedData;
 };

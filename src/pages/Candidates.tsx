@@ -77,12 +77,6 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
   // Add state for modal visibility and selected engineer
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
   
-  // Debug selectedEngineer changes
-  useEffect(() => {
-    console.log('=== selectedEngineer state changed ===');
-    console.log('New selectedEngineer nearestStation:', selectedEngineer?.nearestStation);
-    console.log('Full selectedEngineer:', selectedEngineer);
-  }, [selectedEngineer]);
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -171,17 +165,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   // Handle engineer edit
   const handleEngineerChange = (engineer: Engineer) => {
-    console.log('=== handleEngineerChange ===');
-    console.log('engineer.nearestStation:', engineer.nearestStation);
-    console.log('Full engineer object:', engineer);
     setSelectedEngineer(engineer);
-    console.log('Updated engineer:', engineer);
-    
-    // Check selectedEngineer state after a small delay
-    setTimeout(() => {
-      console.log('=== selectedEngineer after setState (async check) ===');
-      console.log('selectedEngineer.nearestStation:', selectedEngineer?.nearestStation);
-    }, 100);
   };
 
   const handleSaveEdit = async (engineerToSave?: Engineer) => {
@@ -189,14 +173,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     const engineerData = engineerToSave || selectedEngineer;
     
     if (engineerData) {
-      console.log('=== handleSaveEdit - engineerData ===');
-      console.log('nearestStation:', engineerData.nearestStation);
-      console.log('Full engineer data:', engineerData);
-      console.log('Source:', engineerToSave ? 'localEngineer (direct)' : 'selectedEngineer (fallback)');
-      
       const transformedData = transformUIToDatabaseEngineer(engineerData);
-      console.log('Transformed data nearest_station:', transformedData.nearest_station);
-      
       const success = await updateEngineer(engineerData.id, transformedData);
       if (success) {
         setIsEditOpen(false);
@@ -206,9 +183,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
 
   // Handle creating new engineer
   const handleCreateEngineer = async (formData: NewEngineerType) => {
-    console.log('=== Candidates.tsx handleCreateEngineer formData ===', formData);
     const transformedData = transformUIToDatabaseEngineer(formData);
-    console.log('=== Candidates.tsx handleCreateEngineer transformedData ===', transformedData);
     const result = await createEngineer(transformedData);
     return result !== null;
   };

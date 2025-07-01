@@ -37,29 +37,15 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
   const { user, currentTenant } = useAuth();
 
   useEffect(() => {
-    console.log('=== CandidateEdit useEffect triggered ===');
-    console.log('Previous localEngineer nearestStation:', localEngineer?.nearestStation);
-    console.log('New engineer nearestStation:', engineer?.nearestStation);
     setLocalEngineer(engineer);
-    console.log('After setLocalEngineer');
   }, [engineer]);
 
   // 自社エンジニアの場合、担当者情報を自動入力（初回のみ）
   useEffect(() => {
-    console.log('=== Auto-fill useEffect triggered ===');
-    console.log('engineer:', engineer);
-    console.log('isOwnCompany:', isOwnCompany);
-    console.log('user:', user);
-    console.log('currentTenant:', currentTenant);
-    
     if (engineer && isOwnCompany && user && currentTenant) {
       const newManagerName = user.full_name || user.email || '';
       const newManagerEmail = user.email || '';
       const newCompanyName = currentTenant.name || currentTenant.company_name || '';
-      
-      console.log('Current engineer.managerName:', engineer.managerName);
-      console.log('Current engineer.managerEmail:', engineer.managerEmail);
-      console.log('Current engineer.nearestStation:', engineer.nearestStation);
       
       // Only auto-fill if the fields are empty (first time editing)
       if (!engineer.managerName && !engineer.managerEmail) {
@@ -69,36 +55,20 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
           managerEmail: newManagerEmail,
           companyName: newCompanyName
         };
-        console.log('Auto-filling manager info for new engineer');
-        console.log('Updated engineer nearestStation:', updatedEngineer.nearestStation);
         setLocalEngineer(updatedEngineer);
-      } else {
-        console.log('Not auto-filling because manager info already exists');
       }
     }
   }, [engineer?.id, isOwnCompany]); // Only depend on engineer ID and company type
 
-  // Track localEngineer state changes
-  useEffect(() => {
-    console.log('=== localEngineer state changed ===');
-    console.log('localEngineer nearestStation:', localEngineer?.nearestStation);
-  }, [localEngineer]);
 
   if (!localEngineer) return null;
 
   const handleChange = (field: keyof Engineer, value: any) => {
-    console.log(`=== handleChange ${field} ===`);
-    console.log('Previous value:', localEngineer[field]);
-    console.log('New value:', value);
-    const updatedEngineer = { ...localEngineer, [field]: value };
-    console.log('Updated engineer nearestStation:', updatedEngineer.nearestStation);
-    setLocalEngineer(updatedEngineer);
+    setLocalEngineer({ ...localEngineer, [field]: value });
   };
 
   const handleSave = () => {
     if (localEngineer) {
-      console.log('Saving engineer with nearestStation:', localEngineer.nearestStation);
-      console.log('Full engineer data:', localEngineer);
       onEngineerChange(localEngineer);
       // Pass localEngineer directly to the save callback instead of relying on selectedEngineer
       onSave(localEngineer);
