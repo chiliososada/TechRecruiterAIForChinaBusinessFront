@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { CandidateSelectionDialog } from './CandidateSelectionDialog';
 import { MatchingProgressCard } from './MatchingProgressCard';
 import { Loader } from 'lucide-react';
@@ -28,6 +30,10 @@ export function CandidateToCase() {
   const [matchingResults, setMatchingResults] = useState<EnhancedMatchingResult[]>([]);
   const [apiResponse, setApiResponse] = useState<EngineerToProjectsResponse | null>(null);
   
+  // ユーザー設定可能なマッチング設定
+  const [maxMatches, setMaxMatches] = useState(10);
+  const [minScore, setMinScore] = useState(0.6);
+  
   // デフォルトのマッチング設定
   const defaultFilters: EngineerToProjectsRequest['filters'] = {};
   const defaultWeights: EngineerToProjectsRequest['weights'] = {
@@ -36,8 +42,6 @@ export function CandidateToCase() {
     budget_match: 0.2,
     location_match: 0.15,
   };
-  const defaultMaxMatches = 10;
-  const defaultMinScore = 0.6;
   
   // API呼び出し用のカスタムフック
   const { findProjectsForEngineer } = useEngineerToProjectsMatching();
@@ -148,8 +152,8 @@ export function CandidateToCase() {
       const response = await findProjectsForEngineer(
         engineerId,
         {
-          max_matches: defaultMaxMatches,
-          min_score: defaultMinScore,
+          max_matches: maxMatches,
+          min_score: minScore,
           weights: defaultWeights,
           filters: defaultFilters,
         }
@@ -304,6 +308,39 @@ export function CandidateToCase() {
               </Card>
             )}
 
+            {/* マッチング設定 */}
+            <div className="mt-6 space-y-4 border-t pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="maxMatchesCandidate" className="japanese-text">最大マッチ数</Label>
+                  <Input
+                    id="maxMatchesCandidate"
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={maxMatches}
+                    onChange={(e) => setMaxMatches(parseInt(e.target.value) || 10)}
+                    className="japanese-text"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="minScoreCandidate" className="japanese-text">最小スコア</Label>
+                  <Input
+                    id="minScoreCandidate"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={minScore}
+                    onChange={(e) => setMinScore(parseFloat(e.target.value) || 0.6)}
+                    className="japanese-text"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground japanese-text">
+                最小スコア: 0.0（低い閾値）〜 1.0（高い閾値）
+              </p>
+            </div>
 
             <Button 
               onClick={startMatching} 
@@ -352,7 +389,7 @@ export function CandidateToCase() {
               {apiResponse && (
                 <div className="text-right">
                   <Badge variant="outline" className="japanese-text">
-                    スコア閾値: {formatMatchScore(defaultMinScore)}
+                    スコア閾値: {formatMatchScore(minScore)}
                   </Badge>
                 </div>
               )}
