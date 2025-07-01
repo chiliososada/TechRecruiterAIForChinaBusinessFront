@@ -6,10 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { businessClient } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useEmailTemplates } from '@/hooks/useEmailTemplates';
 
 // プレースホルダー定義
 const PLACEHOLDERS = {
@@ -45,7 +44,7 @@ const PLACEHOLDERS = {
 
 type TemplateType = 'project_introduction' | 'engineer_introduction';
 
-interface EmailTemplate {
+interface LocalEmailTemplate {
   id?: string;
   name: string;
   category: TemplateType;
@@ -57,10 +56,16 @@ interface EmailTemplate {
 export function EmailTemplateSettings() {
   const { currentTenant } = useAuth();
   const [activeTab, setActiveTab] = useState<TemplateType>('project_introduction');
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { 
+    templates: dbTemplates, 
+    loading, 
+    refreshTemplates,
+    updateTemplate,
+    createTemplate 
+  } = useEmailTemplates({ autoLoad: true });
   
-  const [templates, setTemplates] = useState<Record<TemplateType, EmailTemplate>>({
+  const [templates, setTemplates] = useState<Record<TemplateType, LocalEmailTemplate>>({
     project_introduction: {
       name: '案件紹介メールテンプレート',
       category: 'project_introduction',
@@ -131,64 +136,26 @@ EMAIL: info@example.com
     templateType: TemplateType;
   } | null>(null);
 
-  // テンプレートの読み込み
+  // データベースからのテンプレートデータを同期
   useEffect(() => {
-    if (currentTenant?.id) {
-      loadTemplates();
+    if (dbTemplates && dbTemplates.length > 0) {
+      const newTemplates = { ...templates };
+      dbTemplates.forEach((template) => {
+        const category = template.category as TemplateType;
+        if (category === 'project_introduction' || category === 'engineer_introduction') {
+          newTemplates[category] = {
+            id: template.id,
+            name: template.name,
+            category: category,
+            subject_template: template.subject_template,
+            body_template_text: template.body_template_text,
+            signature_template: template.signature_template || '',
+          };
+        }
+      });
+      setTemplates(newTemplates);
     }
-  }, [currentTenant?.id]);
-
-  const loadTemplates = async () => {
-    if (!currentTenant?.id) {
-      console.log('No tenant ID available');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log('Loading templates for tenant:', currentTenant.id);
-      
-      if (!businessClient) {
-        console.log('Business client not available');
-        return;
-      }
-      
-      const { data, error } = await businessClient
-        .from('email_templates')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .in('category', ['project_introduction', 'engineer_introduction']);
-      
-      console.log('Template query result:', { data, error });
-      
-      if (error) {
-        console.error('Supabase error:', error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const newTemplates = { ...templates };
-        data.forEach((template: any) => {
-          const category = template.category as TemplateType;
-          if (category === 'project_introduction' || category === 'engineer_introduction') {
-            newTemplates[category] = {
-              id: template.id,
-              name: template.name,
-              category: category,
-              subject_template: template.subject_template,
-              body_template_text: template.body_template_text,
-              signature_template: template.signature_template || '',
-            };
-          }
-        });
-        setTemplates(newTemplates);
-      }
-    } catch (error) {
-      console.error('テンプレート読み込みエラー:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [dbTemplates]);
 
   // フォーカス状態をトラッキング
   const handleFocus = (field: 'subject' | 'body' | 'signature', element: HTMLInputElement | HTMLTextAreaElement) => {
@@ -354,84 +321,44 @@ EMAIL: info@example.com
 
     setSaving(true);
     try {
-      // templateTypeが指定されている場合はそれを使用、そうでなければactiveTabを使用
       const targetTemplateType = templateType || activeTab;
-      console.log('Saving template - targetTemplateType:', targetTemplateType, 'activeTab:', activeTab, 'templates:', templates);
-      
-      // activeTabを正規化
       const normalizedActiveTab = targetTemplateType === 'project_introduction' || targetTemplateType === 'engineer_introduction' 
         ? targetTemplateType 
         : 'project_introduction';
       
-      console.log('normalizedActiveTab:', normalizedActiveTab);
       const template = templates[normalizedActiveTab];
-      console.log('template to save:', template);
       if (!template) {
-        console.error('Template not found for normalizedActiveTab:', normalizedActiveTab, 'Available templates:', Object.keys(templates));
         throw new Error('テンプレートが見つかりません');
       }
+
       const templateData = {
-        tenant_id: currentTenant.id,
         name: template.name,
         category: template.category,
         subject_template: template.subject_template,
         body_template_text: template.body_template_text,
         signature_template: template.signature_template,
-        is_active: true,
       };
-      
-      console.log('templateData to save:', templateData);
 
       if (template.id) {
-        if (!businessClient) {
-          throw new Error('Business client not initialized');
-        }
-        
         // 更新
-        console.log('Updating template with ID:', template.id);
-        const { error } = await businessClient
-          .from('email_templates')
-          .update(templateData)
-          .eq('id', template.id);
-        
-        console.log('Update result - error:', error);
-
-        if (error) throw error;
+        await updateTemplate({
+          id: template.id,
+          ...templateData,
+        });
       } else {
-        if (!businessClient) {
-          throw new Error('Business client not initialized');
-        }
-        
         // 新規作成
-        console.log('Creating new template');
-        const { data, error } = await businessClient
-          .from('email_templates')
-          .insert(templateData)
-          .select()
-          .single();
-        
-        console.log('Insert result - data:', data, 'error:', error);
-
-        if (error) throw error;
-
-        if (data) {
+        const newTemplate = await createTemplate(templateData);
+        if (newTemplate) {
           const newTemplates = { ...templates };
-          newTemplates[normalizedActiveTab].id = data.id;
+          newTemplates[normalizedActiveTab].id = newTemplate.id;
           setTemplates(newTemplates);
         }
       }
 
-      toast({
-        title: '保存完了',
-        description: 'テンプレートを保存しました',
-      });
+      // データを再読み込み
+      await refreshTemplates();
     } catch (error) {
       console.error('テンプレート保存エラー:', error);
-      toast({
-        title: 'エラー',
-        description: 'テンプレートの保存に失敗しました',
-        variant: 'destructive',
-      });
     } finally {
       setSaving(false);
     }

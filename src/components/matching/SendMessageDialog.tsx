@@ -19,28 +19,9 @@ import { Send, Pencil, Eye, EyeOff, User, Users } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { sendIndividualEmail } from '@/utils/backend-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailTemplates } from '@/hooks/useEmailTemplates';
+import { emailTemplateService } from '@/services/emailTemplateService';
 
-// Define email templates
-const EMAIL_TEMPLATES = [
-  {
-    id: 'template-intro',
-    name: '案件紹介テンプレート',
-    subject: '【案件紹介】{{caseName}} - {{caseCompany}}',
-    body: `{{recipientName}} 様\n\n株式会社〇〇の〇〇でございます。\n\nこの度は、以下の案件をご紹介させていただきます。\n\n■案件名: {{caseName}}\n■クライアント: {{caseCompany}}\n■スキル: {{caseSkills}}\n■担当者: {{caseManager}}\n\n{{caseDescription}}\n\nご興味がございましたら、ご連絡いただければ幸いです。\n\nよろしくお願い申し上げます。`
-  },
-  {
-    id: 'template-candidate',
-    name: '人材紹介テンプレート',
-    subject: '【人材紹介】{{candidateName}} - {{candidateSkills}}',
-    body: `{{recipientName}} 様\n\n株式会社〇〇の〇〇でございます。\n\nこの度は、以下の人材をご紹介させていただきます。\n\n■名前: {{candidateName}}\n■スキル: {{candidateSkills}}\n■経験: {{candidateExperience}}\n\n上記案件に最適なマッチングと判断いたしました。ご検討いただけますと幸いです。\n\nよろしくお願い申し上げます。`
-  },
-  {
-    id: 'template-project-intro',
-    name: '案件推薦テンプレート（人材向け）',
-    subject: '【案件推薦】{{caseName}} - マッチング率{{matchingRate}}',
-    body: `{{recipientName}} 様\n\nお世話になっております。\n\n{{candidateName}}様のスキルセットに最適な案件をご紹介させていただきます。\n\n■案件名: {{caseName}}\n■クライアント: {{caseCompany}}\n■マッチング率: {{matchingRate}}\n■案件担当者: {{caseManager}}\n\n■マッチング理由:\n{{matchingReason}}\n\nご興味がございましたら、詳細をご説明させていただきます。\n\nよろしくお願い申し上げます。`
-  }
-];
 
 interface SendMessageDialogProps {
   isOpen: boolean;
@@ -65,6 +46,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
   const [emailAddress, setEmailAddress] = useState('');
   const [isContactSelectOpen, setIsContactSelectOpen] = useState(false);
   const { user, currentTenant } = useAuth();
+  const { templates, loading: templatesLoading } = useEmailTemplates();
 
   // This useEffect will run whenever isOpen or matchData changes
   useEffect(() => {
@@ -82,6 +64,48 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
 
   const recipientCompany = matchData.caseCompany || '未設定';
   
+  const replacePlaceholders = (text: string): string => {
+    if (!text || !matchData) return text;
+    
+    let result = text;
+    
+    // プロジェクト関連のプレースホルダー
+    result = result.replace(/{project_title}/g, matchData.caseName || '');
+    result = result.replace(/{project_description}/g, matchData.projectDetail?.description || '');
+    result = result.replace(/{project_skills}/g, matchData.skills?.join(', ') || '');
+    result = result.replace(/{project_location}/g, matchData.projectDetail?.location || '');
+    result = result.replace(/{project_budget}/g, matchData.projectDetail?.budget || '');
+    result = result.replace(/{project_duration}/g, matchData.projectDetail?.duration || '');
+    result = result.replace(/{project_start_date}/g, matchData.projectDetail?.start_date || '');
+    result = result.replace(/{project_japanese_level}/g, matchData.projectDetail?.japanese_level || '');
+    result = result.replace(/{project_experience}/g, matchData.experience || '');
+    result = result.replace(/{project_key_technologies}/g, matchData.projectDetail?.key_technologies || '');
+    result = result.replace(/{project_work_type}/g, matchData.projectDetail?.work_type || '');
+    result = result.replace(/{project_max_candidates}/g, matchData.projectDetail?.max_candidates?.toString() || '');
+    
+    // 技術者関連のプレースホルダー
+    result = result.replace(/{engineer_name}/g, matchData.candidateName || '');
+    result = result.replace(/{engineer_email}/g, matchData.engineerDetail?.email || '');
+    result = result.replace(/{engineer_skills}/g, matchData.matchedSkills || (Array.isArray(matchData.skills) ? matchData.skills.join(', ') : matchData.skills || ''));
+    result = result.replace(/{engineer_experience}/g, matchData.experience || '');
+    result = result.replace(/{engineer_japanese_level}/g, matchData.engineerDetail?.japanese_level || '');
+    result = result.replace(/{engineer_nearest_station}/g, matchData.engineerDetail?.nearest_station || '');
+    result = result.replace(/{engineer_desired_rate}/g, matchData.engineerDetail?.desired_rate || '');
+    result = result.replace(/{engineer_availability}/g, matchData.engineerDetail?.availability || '');
+    result = result.replace(/{engineer_nationality}/g, matchData.nationality || '');
+    result = result.replace(/{engineer_education}/g, matchData.engineerDetail?.education || '');
+    result = result.replace(/{engineer_certifications}/g, matchData.engineerDetail?.certifications || '');
+    result = result.replace(/{engineer_self_promotion}/g, matchData.engineerDetail?.self_promotion || '');
+    
+    // その他のプレースホルダー
+    result = result.replace(/{matching_rate}/g, matchData.matchingRate || '');
+    result = result.replace(/{matching_reason}/g, matchData.matchingReason || matchData.recommendationComment || '');
+    result = result.replace(/{case_manager}/g, matchData.caseManager || '');
+    result = result.replace(/{case_company}/g, matchData.caseCompany || '');
+    
+    return result;
+  };
+
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
     
@@ -89,40 +113,25 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
       return;
     }
     
-    const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === templateId);
     if (!template) return;
     
-    // Replace placeholders in template
-    let newSubject = template.subject;
-    let newBody = template.body;
+    // テンプレートの使用回数を更新
+    if (currentTenant?.id) {
+      // 非同期で使用回数を更新（エラーハンドリングは不要）
+      emailTemplateService.incrementUsageCount(template.id, currentTenant.id).catch(() => {});
+    }
     
-    // Replace common placeholders
-    newSubject = newSubject.replace(/{{caseName}}/g, matchData.caseName || '');
-    newSubject = newSubject.replace(/{{caseCompany}}/g, matchData.caseCompany || '');
-    newSubject = newSubject.replace(/{{candidateName}}/g, matchData.candidateName || '');
-    newSubject = newSubject.replace(/{{matchingRate}}/g, matchData.matchingRate || '');
-    
-    // Determine recipient name based on context
-    const recipientName = templateId === 'template-project-intro' 
-      ? (matchData.affiliationManager || matchData.candidateName || '担当者')
-      : (matchData.caseManager || matchData.caseCompany || '担当者');
-    
-    newBody = newBody.replace(/{{recipientName}}/g, recipientName);
-    newBody = newBody.replace(/{{caseName}}/g, matchData.caseName || '');
-    newBody = newBody.replace(/{{caseCompany}}/g, matchData.caseCompany || '');
-    newBody = newBody.replace(/{{caseSkills}}/g, 'Java, Spring, React, TypeScript');
-    newBody = newBody.replace(/{{caseDescription}}/g, '金融系システムの開発案件です。React, TypeScriptを使用した画面開発が主な業務となります。');
-    newBody = newBody.replace(/{{caseManager}}/g, matchData.caseManager || '未設定');
-    newBody = newBody.replace(/{{matchingRate}}/g, matchData.matchingRate || '');
-    newBody = newBody.replace(/{{matchingReason}}/g, matchData.matchingReason || matchData.recommendationComment || '');
-    
-    // Replace candidate placeholders
-    newBody = newBody.replace(/{{candidateName}}/g, matchData.candidateName || '');
-    newBody = newBody.replace(/{{candidateSkills}}/g, 'Java, Spring, React, TypeScript');
-    newBody = newBody.replace(/{{candidateExperience}}/g, '5年');
+    // プレースホルダーを置換
+    const newSubject = replacePlaceholders(template.subject_template);
+    const newBody = replacePlaceholders(template.body_template_text);
+    const newSignature = replacePlaceholders(template.signature_template || '');
     
     setSubject(newSubject);
     setMessage(newBody);
+    if (newSignature) {
+      setSignature(newSignature);
+    }
   };
 
   const handleSend = async () => {
@@ -299,7 +308,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="no-template" className="japanese-text">テンプレートなし</SelectItem>
-                    {EMAIL_TEMPLATES.map(template => (
+                    {!templatesLoading && templates.map(template => (
                       <SelectItem key={template.id} value={template.id} className="japanese-text">
                         {template.name}
                       </SelectItem>
