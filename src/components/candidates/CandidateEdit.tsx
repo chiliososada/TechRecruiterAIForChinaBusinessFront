@@ -40,18 +40,26 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
     setLocalEngineer(engineer);
   }, [engineer]);
 
-  // 自社エンジニアの場合、担当者情報を自動入力
+  // 自社エンジニアの場合、担当者情報を自動入力（初回のみ）
   useEffect(() => {
-    if (localEngineer && isOwnCompany && user && currentTenant) {
-      const updatedEngineer = {
-        ...localEngineer,
-        managerName: user.full_name || user.email || '',
-        managerEmail: user.email || '',
-        companyName: currentTenant.name || currentTenant.company_name || ''
-      };
-      setLocalEngineer(updatedEngineer);
+    if (engineer && isOwnCompany && user && currentTenant) {
+      const newManagerName = user.full_name || user.email || '';
+      const newManagerEmail = user.email || '';
+      const newCompanyName = currentTenant.name || currentTenant.company_name || '';
+      
+      // Only auto-fill if the fields are empty (first time editing)
+      if (!engineer.managerName && !engineer.managerEmail) {
+        const updatedEngineer = {
+          ...engineer,
+          managerName: newManagerName,
+          managerEmail: newManagerEmail,
+          companyName: newCompanyName
+        };
+        console.log('Auto-filling manager info for new engineer');
+        setLocalEngineer(updatedEngineer);
+      }
     }
-  }, [isOwnCompany, user, currentTenant, localEngineer?.id]);
+  }, [engineer?.id, isOwnCompany]); // Only depend on engineer ID and company type
 
   if (!localEngineer) return null;
 
