@@ -349,12 +349,27 @@ EMAIL: info@example.com
   };
 
   // テンプレートの保存
-  const saveTemplate = async () => {
+  const saveTemplate = async (templateType?: TemplateType) => {
     if (!currentTenant?.id) return;
 
     setSaving(true);
     try {
-      const template = templates[activeTab];
+      // templateTypeが指定されている場合はそれを使用、そうでなければactiveTabを使用
+      const targetTemplateType = templateType || activeTab;
+      console.log('Saving template - targetTemplateType:', targetTemplateType, 'activeTab:', activeTab, 'templates:', templates);
+      
+      // activeTabを正規化
+      const normalizedActiveTab = targetTemplateType === 'project_introduction' || targetTemplateType === 'engineer_introduction' 
+        ? targetTemplateType 
+        : 'project_introduction';
+      
+      console.log('normalizedActiveTab:', normalizedActiveTab);
+      const template = templates[normalizedActiveTab];
+      console.log('template to save:', template);
+      if (!template) {
+        console.error('Template not found for normalizedActiveTab:', normalizedActiveTab, 'Available templates:', Object.keys(templates));
+        throw new Error('テンプレートが見つかりません');
+      }
       const templateData = {
         tenant_id: currentTenant.id,
         name: template.name,
@@ -364,6 +379,8 @@ EMAIL: info@example.com
         signature_template: template.signature_template,
         is_active: true,
       };
+      
+      console.log('templateData to save:', templateData);
 
       if (template.id) {
         if (!businessClient) {
@@ -371,10 +388,13 @@ EMAIL: info@example.com
         }
         
         // 更新
+        console.log('Updating template with ID:', template.id);
         const { error } = await businessClient
           .from('email_templates')
           .update(templateData)
           .eq('id', template.id);
+        
+        console.log('Update result - error:', error);
 
         if (error) throw error;
       } else {
@@ -383,17 +403,20 @@ EMAIL: info@example.com
         }
         
         // 新規作成
+        console.log('Creating new template');
         const { data, error } = await businessClient
           .from('email_templates')
           .insert(templateData)
           .select()
           .single();
+        
+        console.log('Insert result - data:', data, 'error:', error);
 
         if (error) throw error;
 
         if (data) {
           const newTemplates = { ...templates };
-          newTemplates[activeTab].id = data.id;
+          newTemplates[normalizedActiveTab].id = data.id;
           setTemplates(newTemplates);
         }
       }
@@ -446,7 +469,10 @@ EMAIL: info@example.com
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TemplateType)}>
+        <Tabs value={activeTab} onValueChange={(value) => {
+          console.log('Changing activeTab to:', value);
+          setActiveTab(value as TemplateType);
+        }}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="project_introduction">案件紹介メールテンプレート</TabsTrigger>
             <TabsTrigger value="engineer_introduction">技術者紹介メールテンプレート</TabsTrigger>
@@ -572,7 +598,7 @@ EMAIL: info@example.com
                 </div>
 
                 <Button 
-                  onClick={saveTemplate} 
+                  onClick={() => saveTemplate('project_introduction')} 
                   disabled={saving}
                   className="w-full"
                 >
@@ -709,7 +735,7 @@ EMAIL: info@example.com
                 </div>
 
                 <Button 
-                  onClick={saveTemplate} 
+                  onClick={() => saveTemplate('engineer_introduction')} 
                   disabled={saving}
                   className="w-full"
                 >

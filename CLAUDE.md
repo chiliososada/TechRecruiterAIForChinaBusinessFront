@@ -286,6 +286,34 @@ CREATE TABLE public.statistics_summary (
   updated_at timestamptz DEFAULT now(),
   PRIMARY KEY (id)
 );
+ table public.email_templates (
+  id uuid not null default gen_random_uuid (),
+  tenant_id uuid not null,
+  name text not null,
+  description text null,
+  category text null,
+  subject_template text not null,
+  body_template_text text not null,
+  body_template_html text null,
+  available_placeholders text[] null default '{}'::text[],
+  required_placeholders text[] null default '{}'::text[],
+  ai_summary_enabled boolean null default false,
+  is_active boolean null default true,
+  usage_count integer null default 0,
+  last_used_at timestamp with time zone null,
+  created_by uuid null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  deleted_at timestamp with time zone null,
+  signature_template text null,
+  constraint email_templates_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create trigger update_email_templates_updated_at BEFORE
+update on email_templates for EACH row
+execute FUNCTION update_updated_at_column ();
+
+
 
 -- 10. AI配置表
 CREATE TABLE public.user_ai_configurations (
