@@ -18,6 +18,13 @@ const emptyStringToNull = (value: string | undefined | null): string | null => {
   return value;
 };
 
+// Helper function to convert string to number for database int fields
+const stringToNumber = (value: string | undefined | null): number => {
+  if (!value || value.trim() === '') return 0;
+  const num = parseInt(value.replace(/[^\d]/g, ''), 10);
+  return isNaN(num) ? 0 : num;
+};
+
 // 将数据库engineer转换为UI engineer格式
 export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Engineer => {
   return {
@@ -48,8 +55,10 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
     phone: dbEngineer.phone || '',
     managerName: dbEngineer.manager_name || '',
     managerEmail: dbEngineer.manager_email || '',
+    desiredRate: dbEngineer.desired_rate ? dbEngineer.desired_rate.toString() : '',
     resumeUrl: dbEngineer.resume_url || '',
     resumeText: dbEngineer.resume_text || '',
+    resumeFileName: dbEngineer.resume_file_name || '',
     recommendation: dbEngineer.recommendation || '',
     registeredAt: new Date(dbEngineer.created_at).toLocaleDateString('ja-JP'),
     updatedAt: new Date(dbEngineer.updated_at).toLocaleDateString('ja-JP')
@@ -58,6 +67,9 @@ export const transformDatabaseToUIEngineer = (dbEngineer: DatabaseEngineer): Eng
 
 // 将UI engineer转换为数据库格式
 export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
+  console.log('=== transformUIToDatabaseEngineer Debug ===');
+  console.log('Input uiEngineer.resumeUrl:', uiEngineer.resumeUrl);
+  console.log('Input uiEngineer.resumeText:', uiEngineer.resumeText ? `${uiEngineer.resumeText.substring(0, 100)}...` : 'No text');
   
   // 处理状态值 - 确保使用正确的数据库状态值
   let dbStatus = '提案中'; // 默认状态
@@ -94,10 +106,16 @@ export const transformUIToDatabaseEngineer = (uiEngineer: any) => {
     phone: emptyStringToNull(uiEngineer.phone),
     manager_name: emptyStringToNull(uiEngineer.managerName),
     manager_email: emptyStringToNull(uiEngineer.managerEmail),
-    resume_url: emptyStringToNull(uiEngineer.resumeUrl),
-    resume_text: emptyStringToNull(uiEngineer.resumeText),
+    desired_rate: stringToNumber(uiEngineer.desiredRate),
+    resume_url: uiEngineer.resumeUrl || null,
+    resume_text: uiEngineer.resumeText || null,
+    resume_file_name: uiEngineer.resumeFileName || null,
     recommendation: emptyStringToNull(uiEngineer.recommendation)
   };
+  
+  console.log('=== Output transformedData ===');
+  console.log('Output resume_url:', transformedData.resume_url);
+  console.log('Output resume_text:', transformedData.resume_text ? `${transformedData.resume_text.substring(0, 100)}...` : 'No text');
   
   return transformedData;
 };

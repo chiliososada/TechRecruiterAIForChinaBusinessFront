@@ -21,9 +21,9 @@ export function Dashboard() {
   const { currentTenant, loading: authLoading } = useAuth();
   
   // データベースから実データを取得
-  const { projects, loading: projectsLoading } = useProjects();
-  const { engineers: ownEngineers, loading: ownEngineersLoading, error: ownEngineersError } = useEngineers('own');
-  const { engineers: otherEngineers, loading: otherEngineersLoading, error: otherEngineersError } = useEngineers('other');
+  const { projects, loading: projectsLoading, fetchProjects } = useProjects();
+  const { engineers: ownEngineers, loading: ownEngineersLoading, error: ownEngineersError, refetch: refetchOwnEngineers } = useEngineers('own');
+  const { engineers: otherEngineers, loading: otherEngineersLoading, error: otherEngineersError, refetch: refetchOtherEngineers } = useEngineers('other');
   
   // 全エンジニアを結合
   const allEngineers = [...ownEngineers, ...otherEngineers];
@@ -236,17 +236,6 @@ export function Dashboard() {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-  // 実データから地域分布を計算
-  const locationCounts = new Map();
-  projects.forEach(project => {
-    const location = project.location || 'その他';
-    locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
-  });
-  
-  const locationData = Array.from(locationCounts.entries())
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 5)
-    .map(([name, value]) => ({ name, 案件数: value }));
 
   // ローディング表示
   if (isLoading) {
@@ -292,14 +281,26 @@ export function Dashboard() {
             <p className="text-muted-foreground japanese-text">案件や候補者の最新情報を確認できます。</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="japanese-text">
-              レポート出力
-            </Button>
-            <Button variant="default" size="sm" className="japanese-text" onClick={() => {
-              toast({
-                title: "データを更新しました",
-                description: "最新の情報に更新されました。",
-              });
+            <Button variant="default" size="sm" className="japanese-text" onClick={async () => {
+              try {
+                // 全てのデータを再取得
+                await Promise.all([
+                  fetchProjects(),
+                  refetchOwnEngineers(),
+                  refetchOtherEngineers()
+                ]);
+                toast({
+                  title: "データを更新しました",
+                  description: "最新の情報に更新されました。",
+                });
+              } catch (error) {
+                console.error('データ更新エラー:', error);
+                toast({
+                  title: "更新エラー",
+                  description: "データの更新に失敗しました。",
+                  variant: "destructive",
+                });
+              }
             }}>
               更新
             </Button>
@@ -422,11 +423,10 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="all" className="mt-2">
-                <TabsList className="mb-4 grid grid-cols-4 mb-4">
+                <TabsList className="mb-4 grid grid-cols-3 mb-4">
                   <TabsTrigger value="all" className="japanese-text text-xs">全て</TabsTrigger>
                   <TabsTrigger value="3days" className="japanese-text text-xs">3日以内</TabsTrigger>
                   <TabsTrigger value="week" className="japanese-text text-xs">1週間以内</TabsTrigger>
-                  <TabsTrigger value="location" className="japanese-text text-xs">地域別</TabsTrigger>
                 </TabsList>
                 <TabsContent value="all" className="space-y-4">
                   <div className="space-y-4">
@@ -447,22 +447,6 @@ export function Dashboard() {
                     {renderCaseItems(lastWeekMailCases)}
                     <h4 className="text-sm font-medium text-muted-foreground japanese-text">手動登録（1週間以内）</h4>
                     {renderCaseItems(lastWeekManualCases)}
-                  </div>
-                </TabsContent>
-                <TabsContent value="location" className="space-y-4 pt-4">
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={locationData}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="案件数" fill="#8884d8" />
-                      </BarChart>
-                    </ResponsiveContainer>
                   </div>
                 </TabsContent>
               </Tabs>

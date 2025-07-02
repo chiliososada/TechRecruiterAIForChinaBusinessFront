@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger, TabsWithContext } from '@/components/ui/tabs';
 import { CandidateList } from '@/components/candidates/CandidateList';
-import { CandidateFormStyled as CandidateForm } from '@/components/candidates/CandidateFormStyled';
 import { ResumeUploadStyled as ResumeUpload } from '@/components/candidates/ResumeUploadStyled';
 import { useLocation } from 'react-router-dom';
 import { Engineer, NewEngineerType } from '@/components/candidates/types';
@@ -20,40 +19,42 @@ interface CandidatesProps {
   companyType?: 'own' | 'other';
 }
 
-// Creating mock initialData for CandidateForm
-const initialCandidateData: NewEngineerType = {
-  name: '',
-  skills: '',
-  japaneseLevel: '',
-  englishLevel: '',
-  experience: '',
-  availability: '',
-  status: '',
-  nationality: '',
-  age: '',
-  gender: '',
-  nearestStation: '',
-  education: '',
-  arrivalYear: '',
-  certifications: '',
-  remarks: '',
-  companyType: '自社',
-  companyName: '',
-  source: '',
-  selfPromotion: '',
-  workScope: '',
-  workExperience: '',
-  email: '',      // Added email field
-  phone: '',      // Added phone field
-  managerName: '', // Added manager name field
-  managerEmail: '', // Added manager email field
-  registeredAt: '',
-  updatedAt: '',
-};
 
 export function Candidates({ companyType = 'own' }: CandidatesProps) {
   const location = useLocation();
   const { currentTenant, loading: authLoading } = useAuth();
+  
+  // URLからファイル名を抽出するヘルパー関数
+  const extractFileNameFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      const fileName = pathParts[pathParts.length - 1];
+      
+      // タイムスタンプ付きファイル名から元のファイル名を推測
+      const decodedFileName = decodeURIComponent(fileName);
+      const timestampPattern = /^\d{8}_\d{6}_(.+)$/;
+      const match = decodedFileName.match(timestampPattern);
+      
+      if (match && match[1]) {
+        let originalName = match[1];
+        
+        // 特殊なケースの処理
+        if (originalName === '-.xls' || originalName === '-.xlsx') {
+          return '履歴書.xls';
+        } else if (originalName.startsWith('-')) {
+          originalName = '職務経歴書' + originalName;
+        }
+        
+        return originalName;
+      }
+      
+      return decodedFileName;
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error);
+      return '履歴書ファイル';
+    }
+  };
   
   // Company type from URL for backward compatibility
   const urlCompanyType = location.pathname.includes('/company/other') ? 'other' : 'own';
@@ -71,8 +72,6 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
   // Transform database engineers to UI format
   const engineers = dbEngineers.map(transformDatabaseToUIEngineer);
 
-  const [recommendationTemplate, setRecommendationTemplate] = useState<string>('');
-  const [recommendationText, setRecommendationText] = useState<string>('');
 
   // Add state for modal visibility and selected engineer
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
@@ -129,14 +128,55 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     const engineer = dbEngineers.find(e => e.id === id);
     if (engineer && engineer.resume_url) {
       try {
+        // データベースのresume_file_nameを使用、なければデフォルト名を生成
+        console.log('=== Resume Download Debug ===');
+        console.log('Engineer ID:', id);
+        console.log('Engineer name:', engineer.name);
+        console.log('Database resume_file_name:', engineer.resume_file_name);
+        console.log('Resume URL:', engineer.resume_url);
+        
+        let downloadFileName = engineer.resume_file_name;
+        if (!downloadFileName || downloadFileName.trim() === '') {
+          // データベースにファイル名がない場合、URLから抽出を試行
+          console.log('resume_file_name is empty, trying to extract from URL');
+          
+          // URLからファイル名を抽出してタイムスタンプ部分を除去
+          const urlFileName = extractFileNameFromUrl(engineer.resume_url);
+          
+          if (urlFileName && urlFileName !== '履歴書ファイル') {
+            downloadFileName = urlFileName;
+            console.log('Extracted filename from URL:', downloadFileName);
+          } else {
+            // 最終フォールバック: 従来の形式
+            const extension = engineer.resume_url.includes('.xlsx') ? '.xlsx' : '.xls';
+            downloadFileName = `履歴書_${engineer.name}_${new Date().toISOString().split('T')[0]}${extension}`;
+            console.log('Using fallback filename:', downloadFileName);
+          }
+        } else {
+          console.log('Using database filename:', downloadFileName);
+        }
+        
+        console.log('Final download filename:', downloadFileName);
+        
+        // fetch APIを使用してファイルをダウンロードし、正しいファイル名を設定
+        const response = await fetch(engineer.resume_url);
+        const blob = await response.blob();
+        
+        // Blobからダウンロード用URLを作成
+        const downloadUrl = window.URL.createObjectURL(blob);
+        
         // Create a temporary anchor element to trigger download
         const link = document.createElement('a');
-        link.href = engineer.resume_url;
-        link.download = `履歴書_${engineer.name}_${new Date().toISOString().split('T')[0]}.pdf`;
-        link.target = '_blank';
+        link.href = downloadUrl;
+        link.download = downloadFileName;
+        link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        // Clean up the temporary URL
+        window.URL.revokeObjectURL(downloadUrl);
+        
         toast.success('履歴書のダウンロードを開始しました');
       } catch (error) {
         console.error('Resume download error:', error);
@@ -147,21 +187,6 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     }
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Form submission is handled by the form component now
-  };
-
-  const handleDataChange = (data: any) => {
-    // Handle data change
-    console.log('Form data changed:', data);
-  };
-
-  const handleGenerateRecommendation = () => {
-    // Handle recommendation generation
-    toast.success('推薦文を生成しました');
-  };
 
   // Handle engineer edit
   const handleEngineerChange = (engineer: Engineer) => {
@@ -172,8 +197,23 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     // Use the engineerToSave parameter if provided, otherwise fall back to selectedEngineer
     const engineerData = engineerToSave || selectedEngineer;
     
+    console.log('=== Candidates handleSaveEdit Debug ===');
+    console.log('Original engineer data:', {
+      id: engineerData?.id,
+      name: engineerData?.name,
+      resumeUrl: engineerData?.resumeUrl,
+      resumeText: engineerData?.resumeText ? `${engineerData.resumeText.substring(0, 100)}...` : 'No text'
+    });
+    
     if (engineerData) {
       const transformedData = transformUIToDatabaseEngineer(engineerData);
+      
+      console.log('Transformed data for database:', {
+        id: engineerData.id,
+        resume_url: transformedData.resume_url,
+        resume_text: transformedData.resume_text ? `${transformedData.resume_text.substring(0, 100)}...` : 'No text'
+      });
+      
       const success = await updateEngineer(engineerData.id, transformedData);
       if (success) {
         setIsEditOpen(false);
@@ -246,9 +286,8 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
         
         <TabsWithContext defaultValue="list" className="w-full" contextId={tabContextId}>
           <TabsList className="mb-4">
-            <TabsTrigger value="list" contextId={tabContextId} className="japanese-text">人材一覧</TabsTrigger>
-            <TabsTrigger value="add" contextId={tabContextId} className="japanese-text">新規登録</TabsTrigger>
-            <TabsTrigger value="resume" contextId={tabContextId} className="japanese-text">履歴書アップロード</TabsTrigger>
+            <TabsTrigger value="list" contextId={tabContextId} className="japanese-text">技術者一覧</TabsTrigger>
+            <TabsTrigger value="resume" contextId={tabContextId} className="japanese-text">技術者登録</TabsTrigger>
           </TabsList>
           
           <TabsContent value="list" contextId={tabContextId} className="w-full">
@@ -263,23 +302,6 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
             />
           </TabsContent>
           
-          <TabsContent value="add" contextId={tabContextId}>
-            <CandidateForm 
-              initialData={{
-                ...initialCandidateData,
-                companyType: effectiveCompanyType === 'own' ? '自社' : '他社'
-              }}
-              onSubmit={handleSubmit}
-              onDataChange={handleDataChange}
-              onCreateEngineer={handleCreateEngineer}
-              recommendationTemplate={recommendationTemplate}
-              recommendationText={recommendationText}
-              onRecommendationTemplateChange={setRecommendationTemplate}
-              onRecommendationTextChange={setRecommendationText}
-              onGenerateRecommendation={handleGenerateRecommendation}
-              isOwnCompany={effectiveCompanyType === 'own'}
-            />
-          </TabsContent>
           
           <TabsContent value="resume" contextId={tabContextId}>
             <ResumeUpload 

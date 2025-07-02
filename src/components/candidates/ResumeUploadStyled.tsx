@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,13 +17,13 @@ interface ResumeUploadProps {
 }
 
 export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: ResumeUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any>(null);
   const [showParsedDataPreview, setShowParsedDataPreview] = useState(false);
-  const { currentTenant, token } = useAuth();
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
+  const { currentTenant, token, user } = useAuth();
 
   // JSON数据转换函数 - 将API返回的数据转换为表单数据
   const transformParsedDataToForm = (apiData: any) => {
@@ -37,7 +37,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
       return String(value);
     };
     
-    // 年龄转换函数 - 将数字转换为"数字歳"格式
+    // 年齢変換関数 - 数字を"数字歳"形式に変換
     const safeAge = (value: any): string => {
       if (value === null || value === undefined || value === '') {
         return '';
@@ -54,14 +54,14 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
       return ageStr;
     };
     
-    // 经验年数转换函数 - 处理"8年11ヶ月"或"8年"格式
+    // 経験年数変換関数 - "8年11ヶ月"または"8年"形式を処理
     const safeExperience = (value: any): string => {
       if (value === null || value === undefined || value === '') {
         return '';
       }
       const expStr = String(value).trim();
       
-      // 如果已经是表单中的标准格式，直接返回
+      // 既にフォームの標準形式の場合、そのまま返す
       const standardFormats = [
         '未経験', '1年未満', '1年', '2年', '3年', '4年', '5年', '6年', '7年', '8年', '9年', '10年',
         '11年', '12年', '13年', '14年', '15年', '16年', '17年', '18年', '19年', '20年', '20年以上'
@@ -70,7 +70,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         return expStr;
       }
       
-      // 解析"X年Y ヶ月"格式
+      // "X年Y ヶ月"形式を解析
       const yearMonthMatch = expStr.match(/(\d+)年(\d+)ヶ月/);
       if (yearMonthMatch) {
         const years = parseInt(yearMonthMatch[1]);
@@ -95,7 +95,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         }
       }
       
-      // 解析"X年"格式
+      // "X年"形式を解析
       const yearMatch = expStr.match(/(\d+)年/);
       if (yearMatch) {
         const years = parseInt(yearMatch[1]);
@@ -120,18 +120,18 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         return years + '年';
       }
       
-      // 其他情况返回原值
+      // その他の場合は元の値を返す
       return expStr;
     };
     
-    // 日语等级转换函数 - 转换为表单中的标准格式
+    // 日本語レベル変換関数 - フォームの標準形式に変換
     const safeJapaneseLevel = (value: any): string => {
       if (value === null || value === undefined || value === '') {
         return '';
       }
       const levelStr = String(value).trim();
       
-      // 如果已经是表单中的标准格式，直接返回
+      // 既にフォームの標準形式の場合、そのまま返す
       const standardFormats = ['日常会話レベル', 'ビジネスレベル', 'ネイティブレベル'];
       if (standardFormats.includes(levelStr)) {
         return levelStr;
@@ -192,6 +192,8 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
       // 稼働状況・ステータス
       availability: safeString(data?.availability),
       status: safeString(data?.status),
+      // 希望単価
+      desiredRate: data?.desired_rate ? data.desired_rate.toString() : '',
       // 他社の場合の必須フィールド
       companyName: safeString(data?.company_name),
       managerName: safeString(data?.manager_name),
@@ -220,42 +222,32 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
     // 稼働状況・ステータス
     availability: '',
     status: '',
+    // 希望単価
+    desiredRate: '',
     // 他社の場合の必須フィールド
     companyName: '',
     managerName: '',
     managerEmail: ''
   });
 
-  const [recommendationTemplate, setRecommendationTemplate] = useState(
-    `[名前]は[スキル]を中心に[経験]年の開発経験があり、日本語は[日本語レベル]です。
-[得意分野]に強みがあり、[ツール]などの技術も習得しています。
-チームリーダーとしての経験もあり、要件定義から設計、実装、テストまでの一連の開発プロセスを担当できます。
-[備考]`
-  );
+  // 自社エンジニアの場合、担当者情報を自動入力
+  useEffect(() => {
+    if (isOwnCompany && user && currentTenant) {
+      setCandidateData(prev => ({
+        ...prev,
+        managerName: user.full_name || user.email || '',
+        managerEmail: user.email || '',
+        companyName: currentTenant.name || currentTenant.company_name || ''
+      }));
+    }
+  }, [isOwnCompany, user, currentTenant]);
+
   const [recommendationText, setRecommendationText] = useState('');
   
   const handleFormChange = (field: string, value: string) => {
     setCandidateData(prev => ({ ...prev, [field]: value }));
   };
 
-  const generateRecommendation = () => {
-    toast.success('推薦文を生成中...', { duration: 2000 });
-    
-    setTimeout(() => {
-      const skillsArray = candidateData.skills.split(',').map(s => s.trim());
-      const newText = recommendationTemplate
-        .replace('[名前]', `${candidateData.name}さん`)
-        .replace('[スキル]', skillsArray.slice(0, 2).join('と'))
-        .replace('[経験]', candidateData.experience?.replace('年', '') || '5')
-        .replace('[日本語レベル]', candidateData.japaneseLevel)
-        .replace('[得意分野]', '金融系のプロジェクト')
-        .replace('[ツール]', skillsArray.slice(2).join('や'))
-        .replace('[備考]', candidateData.remarks);
-        
-      setRecommendationText(newText);
-      toast.success('推薦文が生成されました');
-    }, 2000);
-  };
 
   const handleSaveCandidate = async () => {
     if (!onCreateEngineer) {
@@ -312,9 +304,11 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
       let resumeUrl = '';
       let resumeText = '';
       
-      
-      // ファイルがある場合、まず履歴書ファイルをアップロード
-      if (uploadedFile) {
+      // 解析済みのファイルURLがある場合はそれを使用、なければアップロード
+      if (uploadedFileUrl) {
+        resumeUrl = uploadedFileUrl;
+        console.log('解析済みファイルURLを使用:', resumeUrl);
+      } else if (uploadedFile) {
         toast.info('履歴書ファイルをアップロード中...');
         const uploadResult = await uploadResumeFile(uploadedFile);
         
@@ -372,7 +366,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
       console.log('=== ResumeUpload submitting data ===', formData);
       const success = await onCreateEngineer(formData);
       if (success) {
-        toast.success('候補者情報と推薦文が保存されました', {
+        toast.success('技術者情報と推薦文が保存されました', {
           description: `${candidateData.name}さんのプロフィールが登録されました`
         });
         
@@ -397,6 +391,8 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
           // 稼働状況・ステータス
           availability: '',
           status: '',
+          // 希望単価
+          desiredRate: '',
           // 他社の場合の必須フィールド
           companyName: '',
           managerName: '',
@@ -546,11 +542,17 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         setParsedData(apiResponse);
         setShowParsedDataPreview(true);
         
+        // ファイルURLを保存（後でアップロード時に使用）
+        if (apiResponse.data.file_url) {
+          setUploadedFileUrl(apiResponse.data.file_url);
+        }
+        
         // データを変換して表单に自动填充
         const formData = transformParsedDataToForm(apiResponse);
         setCandidateData(formData);
         
         console.log('変換後のフォームデータ:', formData);
+        console.log('アップロードされたファイルURL:', apiResponse.data.file_url);
         
         toast.success('履歴書の解析が完了しました', {
           description: `${file.name} から情報を抽出しました。内容を確認して保存してください。`
@@ -600,7 +602,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
             >
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 {uploadedFile ? (
-                  // 上传成功后的显示
+                  // アップロード成功後の表示
                   <>
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                       <FileSpreadsheet className="w-8 h-8 text-green-600" />
@@ -634,13 +636,12 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
                   </>
                 )}
                 
-                {(isUploading || isValidating || isParsing) && (
+                {(isValidating || isParsing) && (
                   <div className="mt-6 text-center">
                     <div className="w-10 h-10 border-4 border-t-emerald-500 border-emerald-200 rounded-full animate-spin mx-auto mb-2"></div>
                     <p className="text-sm text-emerald-600">
                       {isValidating && 'ファイル検証中...'}
                       {isParsing && '履歴書解析中...'}
-                      {isUploading && 'アップロード中...'}
                     </p>
                   </div>
                 )}
@@ -651,7 +652,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
                 accept=".xls,.xlsx"
                 className="hidden"
                 onChange={handleFileChange}
-                disabled={isUploading || isValidating || isParsing}
+                disabled={isValidating || isParsing}
               />
             </label>
           </div>
@@ -807,7 +808,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
             技術者情報抽出
           </CardTitle>
           <CardDescription className="japanese-text text-gray-600 text-base">
-            AIにより抽出された候補者情報を編集できます（<span className="text-red-500 font-semibold">*</span>は必須項目）
+            AIにより抽出された技術者情報を編集できます（<span className="text-red-500 font-semibold">*</span>は必須項目）
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8 bg-gray-50">
@@ -838,47 +839,52 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
                   />
                 </div>
 
-                {/* 他社専用フィールド */}
-                {!isOwnCompany && (
-                  <>
-                    <div className="space-y-3">
-                      <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
-                        所属会社 <span className="text-red-500">*</span>
-                      </Label>
-                      <Input 
-                        value={candidateData.companyName} 
-                        className="japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" 
-                        onChange={(e) => handleFormChange('companyName', e.target.value)}
-                        placeholder="例: テックイノベーション株式会社"
-                      />
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
-                        担当者名 <span className="text-red-500">*</span>
-                      </Label>
-                      <Input 
-                        value={candidateData.managerName} 
-                        className="japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" 
-                        onChange={(e) => handleFormChange('managerName', e.target.value)}
-                        placeholder="例: 田中 太郎"
-                      />
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
-                        担当者メール <span className="text-red-500">*</span>
-                      </Label>
-                      <Input 
-                        type="email"
-                        value={candidateData.managerEmail} 
-                        className="japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" 
-                        onChange={(e) => handleFormChange('managerEmail', e.target.value)}
-                        placeholder="例: tanaka@company.co.jp"
-                      />
-                    </div>
-                  </>
-                )}
+                {/* 所属会社（自社の場合は自動入力、他社の場合は手動入力） */}
+                <div className="space-y-3">
+                  <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                    所属会社 <span className="text-red-500">*</span>
+                    {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                  </Label>
+                  <Input 
+                    value={candidateData.companyName} 
+                    className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`} 
+                    onChange={(e) => handleFormChange('companyName', e.target.value)}
+                    placeholder={isOwnCompany ? "自動入力されます" : "例: テックイノベーション株式会社"}
+                    disabled={isOwnCompany}
+                  />
+                </div>
+                
+                {/* 担当者情報（自社の場合は自動入力、他社の場合は手動入力） */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                      担当者名 <span className="text-red-500">*</span>
+                      {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                    </Label>
+                    <Input 
+                      value={candidateData.managerName} 
+                      className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`} 
+                      onChange={(e) => handleFormChange('managerName', e.target.value)}
+                      placeholder={isOwnCompany ? "自動入力されます" : "例: 田中 太郎"}
+                      disabled={isOwnCompany}
+                    />
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="japanese-text font-medium text-gray-700 flex items-center gap-1">
+                      担当者メール <span className="text-red-500">*</span>
+                      {isOwnCompany && <span className="text-sm text-gray-500 ml-2">(自動入力)</span>}
+                    </Label>
+                    <Input 
+                      type="email"
+                      value={candidateData.managerEmail} 
+                      className={`japanese-text border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${isOwnCompany ? 'bg-gray-100' : ''}`} 
+                      onChange={(e) => handleFormChange('managerEmail', e.target.value)}
+                      placeholder={isOwnCompany ? "自動入力されます" : "例: tanaka@company.co.jp"}
+                      disabled={isOwnCompany}
+                    />
+                  </div>
+                </div>
                 
                 <div className="space-y-3">
                   <Label className="japanese-text font-medium text-gray-700">国籍</Label>
@@ -1176,7 +1182,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
                     value={candidateData.selfPromotion} 
                     className="japanese-text border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all min-h-[120px]" 
                     onChange={(e) => handleFormChange('selfPromotion', e.target.value)}
-                    placeholder="候補者の自己アピールを入力"
+                    placeholder="技術者の自己アピールを入力"
                   />
                 </div>
                 
@@ -1222,6 +1228,17 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="japanese-text font-medium text-gray-700">希望単価（万円/月）</Label>
+                    <Input 
+                      type="number"
+                      value={candidateData.desiredRate}
+                      onChange={(e) => handleFormChange('desiredRate', e.target.value)}
+                      placeholder="例: 60, 70"
+                      className="japanese-text border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1229,50 +1246,24 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         </CardContent>
       </Card>
       
-      {/* 推薦文生成セクション */}
+      {/* 推薦文セクション */}
       <Card className="shadow-lg border-0">
         <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-200">
           <CardTitle className="japanese-text text-xl font-bold text-gray-800 flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <Wand2 className="w-5 h-5 text-white" />
             </div>
-            推薦文生成
+            推薦文
           </CardTitle>
-          <CardDescription className="japanese-text text-gray-600">
-            候補者の自動生成された推薦文
-          </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
           <div className="space-y-3">
-            <Label htmlFor="recommendation-template" className="japanese-text font-medium text-gray-700">テンプレート</Label>
             <Textarea 
-              id="recommendation-template" 
-              className="min-h-[150px] japanese-text border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
-              value={recommendationTemplate}
-              onChange={(e) => setRecommendationTemplate(e.target.value)}
-              placeholder="[名前]、[スキル]、[経験]などのプレースホルダーを使用してください"
-            />
-            <p className="text-xs text-gray-500 japanese-text">
-              推薦文のテンプレートを編集できます。[名前]、[スキル]、[経験]などのプレースホルダーを使用します。
-            </p>
-          </div>
-          
-          <Button 
-            onClick={generateRecommendation} 
-            variant="outline" 
-            className="w-full japanese-text border-purple-300 text-purple-700 hover:bg-purple-50 hover:border-purple-400 transition-all"
-          >
-            <Wand2 className="mr-2 h-4 w-4" />
-            AIで推薦文を生成
-          </Button>
-          
-          <div className="space-y-3">
-            <Label htmlFor="generated-recommendation" className="japanese-text font-medium text-gray-700">生成された推薦文</Label>
-            <Textarea 
-              id="generated-recommendation"
+              id="recommendation"
               className="min-h-[150px] japanese-text border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all" 
               value={recommendationText}
               onChange={(e) => setRecommendationText(e.target.value)}
+              placeholder="推薦文を入力してください"
             />
           </div>
         </CardContent>
@@ -1282,7 +1273,7 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
             className="japanese-text bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-2 transition-all shadow-md hover:shadow-lg"
           >
             <Save className="mr-2 h-4 w-4" />
-            候補者と推薦文を保存
+            技術者と推薦文を保存
           </Button>
         </CardFooter>
       </Card>

@@ -31,6 +31,7 @@ export interface DatabaseEngineer {
   phone: string | null;
   manager_name: string | null;
   manager_email: string | null;
+  desired_rate: number | null;
   created_at: string;
   updated_at: string;
   tenant_id: string;
@@ -54,6 +55,7 @@ export interface DatabaseEngineer {
   created_by: string | null;
   resume_url: string | null;
   resume_text: string | null;
+  resume_file_name: string | null;
   preferred_work_style: string[] | null;
   preferred_locations: string[] | null;
   recommendation: string | null;
@@ -157,6 +159,7 @@ export const useEngineers = (companyType: 'own' | 'other') => {
       // 使用已经转换好的数据，只添加必要的系统字段
       const newEngineer = {
         ...engineerData, // 使用已经转换的数据
+        desired_rate: engineerData.desired_rate === '' || engineerData.desired_rate === null || engineerData.desired_rate === undefined ? 0 : (typeof engineerData.desired_rate === 'string' ? parseInt(engineerData.desired_rate) || 0 : engineerData.desired_rate),
         company_type: companyTypeMapping[companyType],
         source: 'manual',
         tenant_id: currentTenant.id,
@@ -224,44 +227,84 @@ export const useEngineers = (companyType: 'own' | 'other') => {
         }
       }
 
-      // 确保状态值符合数据库约束
-      const validStatuses = ['提案中', '事前面談', '面談', '結果待ち', '契約中', '営業終了', 'アーカイブ'];
-      if (!validStatuses.includes(dbStatus)) {
-        dbStatus = '提案中';
+      // engineerDataがすでに変換済みの場合（resume_url, resume_textなどのDB形式フィールドがある場合）は、そのまま使用
+      // UIフィールド（resumeUrl, resumeTextなど）がある場合は、変換が必要
+      const isAlreadyTransformed = engineerData.hasOwnProperty('resume_url') || engineerData.hasOwnProperty('resume_text');
+      
+      let updatedEngineer;
+      if (isAlreadyTransformed) {
+        // すでに変換済みのデータを使用
+        updatedEngineer = {
+          ...engineerData,
+          updated_at: new Date().toISOString()
+        };
+      } else {
+        // UI形式のデータを変換
+        // 处理状态值 - 确保使用正确的数据库状态值
+        let dbStatus = '提案中'; // 默认状态
+        if (engineerData.current_status) {
+          dbStatus = engineerData.current_status;
+        } else if (engineerData.status) {
+          if (Array.isArray(engineerData.status) && engineerData.status.length > 0) {
+            dbStatus = engineerData.status[0];
+          } else if (typeof engineerData.status === 'string') {
+            dbStatus = engineerData.status;
+          }
+        }
+
+        // 确保状态值符合数据库约束
+        const validStatuses = ['提案中', '事前面談', '面談', '結果待ち', '契約中', '営業終了', 'アーカイブ'];
+        if (!validStatuses.includes(dbStatus)) {
+          dbStatus = '提案中';
+        }
+
+        // 准备更新数据，确保所有空字符串转为 null
+        updatedEngineer = {
+          name: engineerData.name,
+          skills: ensureArray(engineerData.skills),
+          japanese_level: engineerData.japanese_level === '' ? null : engineerData.japanese_level,
+          english_level: engineerData.english_level === '' ? null : engineerData.english_level,
+          experience: engineerData.experience,
+          availability: engineerData.availability === '' ? null : engineerData.availability,
+          current_status: dbStatus,
+          remarks: engineerData.remarks === '' ? null : engineerData.remarks,
+          company_name: engineerData.company_name === '' ? null : engineerData.company_name,
+          technical_keywords: ensureArray(engineerData.technical_keywords),
+          self_promotion: engineerData.self_promotion === '' ? null : engineerData.self_promotion,
+          work_scope: engineerData.work_scope === '' ? null : engineerData.work_scope,
+          work_experience: engineerData.work_experience === '' ? null : engineerData.work_experience,
+          nationality: engineerData.nationality === '' ? null : engineerData.nationality,
+          age: engineerData.age === '' ? null : engineerData.age,
+          gender: engineerData.gender === '' ? null : engineerData.gender,
+          nearest_station: engineerData.nearest_station === '' ? null : engineerData.nearest_station,
+          education: engineerData.education === '' ? null : engineerData.education,
+          arrival_year_japan: engineerData.arrival_year_japan === '' ? null : engineerData.arrival_year_japan,
+          certifications: ensureArray(engineerData.certifications),
+          email: engineerData.email === '' ? null : engineerData.email,
+          phone: engineerData.phone === '' ? null : engineerData.phone,
+          manager_name: engineerData.manager_name === '' ? null : engineerData.manager_name,
+          manager_email: engineerData.manager_email === '' ? null : engineerData.manager_email,
+          desired_rate: engineerData.desired_rate === '' || engineerData.desired_rate === null || engineerData.desired_rate === undefined ? 0 : (typeof engineerData.desired_rate === 'string' ? parseInt(engineerData.desired_rate) || 0 : engineerData.desired_rate),
+          resume_url: engineerData.resumeUrl === '' ? null : engineerData.resumeUrl,
+          resume_text: engineerData.resumeText === '' ? null : engineerData.resumeText,
+          resume_file_name: engineerData.resumeFileName === '' ? null : engineerData.resumeFileName,
+          recommendation: engineerData.recommendation === '' ? null : engineerData.recommendation,
+          updated_at: new Date().toISOString()
+        };
       }
 
-      // 准备更新数据，确保所有空字符串转为 null
-      const updatedEngineer = {
-        name: engineerData.name,
-        skills: ensureArray(engineerData.skills),
-        japanese_level: engineerData.japanese_level === '' ? null : engineerData.japanese_level,
-        english_level: engineerData.english_level === '' ? null : engineerData.english_level,
-        experience: engineerData.experience,
-        availability: engineerData.availability === '' ? null : engineerData.availability,
-        current_status: dbStatus,
-        remarks: engineerData.remarks === '' ? null : engineerData.remarks,
-        company_name: engineerData.company_name === '' ? null : engineerData.company_name,
-        technical_keywords: ensureArray(engineerData.technical_keywords),
-        self_promotion: engineerData.self_promotion === '' ? null : engineerData.self_promotion,
-        work_scope: engineerData.work_scope === '' ? null : engineerData.work_scope,
-        work_experience: engineerData.work_experience === '' ? null : engineerData.work_experience,
-        nationality: engineerData.nationality === '' ? null : engineerData.nationality,
-        age: engineerData.age === '' ? null : engineerData.age,
-        gender: engineerData.gender === '' ? null : engineerData.gender,
-        nearest_station: engineerData.nearest_station === '' ? null : engineerData.nearest_station,
-        education: engineerData.education === '' ? null : engineerData.education,
-        arrival_year_japan: engineerData.arrival_year_japan === '' ? null : engineerData.arrival_year_japan,
-        certifications: ensureArray(engineerData.certifications),
-        email: engineerData.email === '' ? null : engineerData.email,
-        phone: engineerData.phone === '' ? null : engineerData.phone,
-        manager_name: engineerData.manager_name === '' ? null : engineerData.manager_name,
-        manager_email: engineerData.manager_email === '' ? null : engineerData.manager_email,
-        recommendation: engineerData.recommendation === '' ? null : engineerData.recommendation,
-        updated_at: new Date().toISOString()
-      };
-
       console.log('=== Final data being sent to database ===');
+      console.log('Input engineerData resume fields:', {
+        resumeUrl: engineerData.resumeUrl,
+        resumeText: engineerData.resumeText ? 'Has text' : 'No text',
+        resumeFileName: engineerData.resumeFileName,
+        resume_url: engineerData.resume_url,
+        resume_text: engineerData.resume_text ? 'Has text' : 'No text',
+        resume_file_name: engineerData.resume_file_name
+      });
       console.log('updatedEngineer.nearest_station:', updatedEngineer.nearest_station);
+      console.log('updatedEngineer.resume_url:', updatedEngineer.resume_url);
+      console.log('updatedEngineer.resume_text:', updatedEngineer.resume_text ? `${updatedEngineer.resume_text.substring(0, 100)}...` : 'No text');
       console.log('Processed engineer data for update:', updatedEngineer);
 
       await businessClientManager.executeWithRetry(async () => {

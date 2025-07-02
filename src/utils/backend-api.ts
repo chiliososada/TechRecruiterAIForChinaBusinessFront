@@ -560,9 +560,10 @@ export const uploadResumeFile = async (
   }
 };
 
-// Delete uploaded resume file
+// Delete uploaded resume file using new API endpoint
 export const deleteUploadedFile = async (
   fileUrl: string,
+  engineerId?: string,
   userFromContext?: { tenant_id: string }
 ): Promise<{ success: boolean; message: string }> => {
   try {
@@ -576,19 +577,57 @@ export const deleteUploadedFile = async (
       };
     }
 
-    console.log('Deleting uploaded file:', fileUrl);
+    // URLからstorage_pathを抽出
+    const extractStoragePathFromUrl = (url: string): string => {
+      try {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/');
+        // パスの例: /storage/v1/object/public/bucket/tenant-id/file-name.xlsx
+        const publicIndex = pathParts.indexOf('public');
+        if (publicIndex !== -1 && publicIndex < pathParts.length - 1) {
+          // bucket名以降のパスを取得
+          return pathParts.slice(publicIndex + 2).join('/');
+        }
+        return url; // フォールバック
+      } catch (error) {
+        console.error('Error extracting storage path:', error);
+        return url; // フォールバック
+      }
+    };
 
-    const response = await fetch(`${API_BASE}/resume-upload/delete`, {
+    const storagePath = extractStoragePathFromUrl(fileUrl);
+    console.log('Deleting uploaded file:', { fileUrl, storagePath, engineerId });
+
+    // engineer_idのバリデーション
+    if (!engineerId) {
+      return {
+        success: false,
+        message: 'エンジニアIDが必要です',
+      };
+    }
+
+    // URL query parameters for the new API
+    const queryParams = new URLSearchParams({
+      storage_path: storagePath,
+      engineer_id: engineerId
+    });
+
+    const deleteUrl = `${API_BASE}/resume-upload/delete/${userInfo.tenant_id}?${queryParams.toString()}`;
+
+    // デバッグ用ログ
+    console.log('API削除リクエストパラメータ:', {
+      tenant_id: userInfo.tenant_id,
+      storage_path: storagePath,
+      engineer_id: engineerId,
+      url: deleteUrl
+    });
+
+    const response = await fetch(deleteUrl, {
       method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
         'X-API-Key': BACKEND_API_KEY,
         'Authorization': accessToken ? `Bearer ${accessToken}` : '',
       },
-      body: JSON.stringify({
-        file_url: fileUrl,
-        tenant_id: userInfo.tenant_id,
-      }),
     });
 
     const data = await response.json();

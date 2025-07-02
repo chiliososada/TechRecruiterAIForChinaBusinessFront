@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { EmailTemplateSettings } from '@/components/settings/EmailTemplateSettings';
@@ -21,7 +20,7 @@ export function Settings() {
   }, [currentTenant?.subscription_plan]);
 
   // Determine default tab based on subscription access
-  const defaultTab = hasGeneralSettingsAccess ? "general" : "ai";
+  const defaultTab = hasGeneralSettingsAccess ? "general" : "templates";
 
   return (
     <MainLayout>
@@ -35,8 +34,7 @@ export function Settings() {
             {hasGeneralSettingsAccess && (
               <TabsTrigger value="general" className="japanese-text">一般設定</TabsTrigger>
             )}
-            <TabsTrigger value="ai" className="japanese-text">AI設定</TabsTrigger>
-            <TabsTrigger value="templates" className="japanese-text">テンプレート</TabsTrigger>
+            <TabsTrigger value="templates" className="japanese-text">メールテンプレート設定</TabsTrigger>
           </TabsList>
           
           {hasGeneralSettingsAccess && (
@@ -80,66 +78,6 @@ export function Settings() {
               </Card>
             </TabsContent>
           )}
-          
-          <TabsContent value="ai" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="japanese-text">AI設定</CardTitle>
-                <CardDescription className="japanese-text">
-                  AIエンジンのパラメータ設定
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="matching-threshold" className="japanese-text">マッチング閾値</Label>
-                      <span className="text-sm">75%</span>
-                    </div>
-                    <Slider
-                      id="matching-threshold"
-                      defaultValue={[75]}
-                      max={100}
-                      step={1}
-                      className="w-full"
-                    />
-                    <p className="text-sm text-muted-foreground japanese-text">
-                      マッチング候補として表示する最低一致率を設定します
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="semantic-matching" className="japanese-text">セマンティックマッチング</Label>
-                      <p className="text-sm text-muted-foreground japanese-text">
-                        意味的な関連性を考慮したマッチングを行います
-                      </p>
-                    </div>
-                    <Switch id="semantic-matching" defaultChecked />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="auto-recommendation" className="japanese-text">自動レコメンデーション</Label>
-                      <p className="text-sm text-muted-foreground japanese-text">
-                        高マッチング率の案件・候補者を自動的に推薦します
-                      </p>
-                    </div>
-                    <Switch id="auto-recommendation" defaultChecked />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key" className="japanese-text">APIキー</Label>
-                    <Input id="api-key" type="password" defaultValue="sk-••••••••••••••••••••••••" />
-                    <p className="text-xs text-muted-foreground japanese-text">
-                      外部AIサービスのAPIキーを設定します（オプション）
-                    </p>
-                  </div>
-                </div>
-                <Button className="w-full japanese-text">設定を保存</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
           
           <TabsContent value="templates" className="space-y-6">
             <EmailTemplateSettings />

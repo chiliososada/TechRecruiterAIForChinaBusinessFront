@@ -5,17 +5,18 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Wand2 } from 'lucide-react';
+import { Save, FileText, X } from 'lucide-react';
 import { Engineer } from './types';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadResumeFile, deleteUploadedFile } from '@/utils/backend-api';
 
 interface CandidateEditProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   engineer: Engineer | null;
   onEngineerChange: (engineer: Engineer) => void;
-  onSave: (engineer?: Engineer) => void;
+  onSave: (engineer?: Engineer) => Promise<void>;
   isOwnCompany: boolean;
 }
 
@@ -28,17 +29,31 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
   isOwnCompany
 }) => {
   const [localEngineer, setLocalEngineer] = useState<Engineer | null>(engineer);
-  const [recommendationTemplate, setRecommendationTemplate] = useState<string>(
-    `[名前]は[スキル]を中心に[経験]年の開発経験があり、日本語は[日本語レベル]です。
-[得意分野]に強みがあり、[ツール]などの技術も習得しています。
-チームリーダーとしての経験もあり、要件定義から設計、実装、テストまでの一連の開発プロセスを担当できます。
-[備考]`
-  );
   const { user, currentTenant } = useAuth();
+  
+  // ファイルアップロード関連のstate
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [fileNameSetByUpload, setFileNameSetByUpload] = useState<boolean>(false);
 
   useEffect(() => {
     setLocalEngineer(engineer);
-  }, [engineer]);
+    // 履歴書ファイル名を初期化 - データベースのresume_file_nameを優先使用
+    if (engineer?.resumeUrl && !fileNameSetByUpload) {
+      console.log('=== Initial File Name Setup ===');
+      console.log('engineer.resumeUrl:', engineer.resumeUrl);
+      console.log('engineer.resumeFileName:', engineer.resumeFileName);
+      
+      // データベースにファイル名がある場合は使用、なければURLから抽出
+      const fileName = engineer.resumeFileName || extractFileNameFromUrl(engineer.resumeUrl);
+      console.log('Final fileName for display:', fileName);
+      setUploadedFileName(fileName);
+    } else if (!engineer?.resumeUrl) {
+      setUploadedFileName('');
+      setFileNameSetByUpload(false);
+    }
+  }, [engineer, fileNameSetByUpload]);
 
   // 自社エンジニアの場合、担当者情報を自動入力（初回のみ）
   useEffect(() => {
@@ -59,7 +74,82 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
       }
     }
   }, [engineer?.id, isOwnCompany]); // Only depend on engineer ID and company type
+  
+  // uploadedFileNameの変更を監視
+  useEffect(() => {
+    console.log('=== uploadedFileName changed ===');
+    console.log('New uploadedFileName:', uploadedFileName);
+  }, [uploadedFileName]);
 
+  // 履歴書テキストから名前を抽出するヘルパー関数
+  const extractNameFromResumeText = (): string | null => {
+    if (!localEngineer?.resumeText) return null;
+    
+    try {
+      // 履歴書テキストから氏名を抽出
+      // パターン1: "氏名\n名前" の形式
+      const nameMatch1 = localEngineer.resumeText.match(/氏名\s*\n?\s*([^\s\n]+)/);
+      if (nameMatch1 && nameMatch1[1]) {
+        return nameMatch1[1];
+      }
+      
+      // パターン2: "フリガナ\n何か\n名前" の形式
+      const nameMatch2 = localEngineer.resumeText.match(/フリガナ\s*\n\s*[^\n]+\s*\n\s*([^\s\n]+)/);
+      if (nameMatch2 && nameMatch2[1]) {
+        return nameMatch2[1];
+      }
+      
+      // パターン3: エンジニア名から取得
+      if (localEngineer.name && localEngineer.name !== '') {
+        return localEngineer.name;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting name from resume text:', error);
+      return null;
+    }
+  };
+
+  // URLからファイル名を抽出するヘルパー関数
+  const extractFileNameFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      const fileName = pathParts[pathParts.length - 1];
+      
+      // タイムスタンプ付きファイル名から元のファイル名を推測
+      // 例: "20250702_161750_-.xls" から "職務経歴書-燕.xls" を抽出
+      const decodedFileName = decodeURIComponent(fileName);
+      const timestampPattern = /^\d{8}_\d{6}_(.+)$/;
+      const match = decodedFileName.match(timestampPattern);
+      
+      if (match && match[1]) {
+        // タイムスタンプを除去した元のファイル名を返す
+        let originalName = match[1];
+        
+        // 特殊なケースの処理
+        if (originalName === '-.xls' || originalName === '-.xlsx') {
+          // resume_textから名前を抽出しようとする
+          const nameFromResume = extractNameFromResumeText();
+          if (nameFromResume) {
+            return `職務経歴書-${nameFromResume}${originalName.substring(1)}`;
+          }
+          return `職務経歴書${originalName}`;
+        } else if (originalName.startsWith('-')) {
+          // ハイフンで始まる場合は適切なプレフィックスを付ける
+          originalName = '職務経歴書' + originalName;
+        }
+        
+        return originalName;
+      }
+      
+      return decodedFileName;
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error);
+      return '履歴書ファイル';
+    }
+  };
 
   if (!localEngineer) return null;
 
@@ -67,11 +157,120 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
     setLocalEngineer({ ...localEngineer, [field]: value });
   };
 
-  const handleSave = () => {
+  // ファイルアップロード処理
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // ファイル形式検証
+    const allowedTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Excel形式のファイル（.xls, .xlsx）のみアップロード可能です');
+      return;
+    }
+
+    // ファイルサイズ検証（10MB）
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('ファイルサイズは10MB以下にしてください');
+      return;
+    }
+
+    setUploadedFile(file);
+    setIsUploading(true);
+
+    try {
+      toast.info('履歴書ファイルをアップロード中...');
+      
+      const uploadResult = await uploadResumeFile(file, localEngineer?.id);
+      
+      if (uploadResult.success && uploadResult.data) {
+        const fileName = uploadResult.data.metadata?.original_filename || 
+                        uploadResult.data.file_name || 
+                        extractFileNameFromUrl(uploadResult.data.file_url || '');
+        
+        const updatedEngineer = {
+          ...localEngineer!,
+          resumeUrl: uploadResult.data.file_url || '',
+          resumeText: uploadResult.data.extracted_text || '',
+          resumeFileName: fileName
+        };
+        
+        // ファイル名をUIに設定
+        console.log('Final fileName to set:', fileName);
+        setUploadedFileName(fileName);
+        setFileNameSetByUpload(true);
+        
+        // 状態を同期的に更新
+        setLocalEngineer(updatedEngineer);
+        onEngineerChange(updatedEngineer);
+        
+        toast.success('履歴書ファイルのアップロードが完了しました。保存ボタンをクリックして変更を保存してください。');
+      } else {
+        toast.error('アップロードに失敗しました: ' + (uploadResult.message || ''));
+      }
+    } catch (error) {
+      console.error('アップロードエラー:', error);
+      toast.error('アップロードに失敗しました');
+    } finally {
+      setIsUploading(false);
+      // ファイル入力をクリア
+      event.target.value = '';
+    }
+  };
+
+  // ファイル削除処理
+  const handleFileDelete = async () => {
+    if (!localEngineer?.resumeUrl) return;
+
+    try {
+      toast.info('履歴書ファイルを削除中...');
+      
+      // バックエンドAPIを使用してファイル削除（engineer_idを含める）
+      const deleteResult = await deleteUploadedFile(localEngineer.resumeUrl, localEngineer.id);
+      
+      if (deleteResult.success) {
+        const updatedEngineer = {
+          ...localEngineer,
+          resumeUrl: '',
+          resumeText: '',
+          resumeFileName: ''
+        };
+        
+        // ファイル名もクリア
+        setUploadedFileName('');
+        setFileNameSetByUpload(false);
+        
+        // 状態を同期的に更新
+        setLocalEngineer(updatedEngineer);
+        onEngineerChange(updatedEngineer);
+        
+        toast.success('履歴書ファイルの削除が完了しました。保存ボタンをクリックして変更を保存してください。');
+      } else {
+        toast.error('削除に失敗しました: ' + (deleteResult.message || ''));
+      }
+    } catch (error) {
+      console.error('削除エラー:', error);
+      toast.error('削除に失敗しました');
+    }
+  };
+
+  const handleSave = async () => {
     if (localEngineer) {
+      console.log('=== CandidateEdit handleSave Debug ===');
+      console.log('LocalEngineer resumeUrl:', localEngineer.resumeUrl);
+      console.log('LocalEngineer resumeText:', localEngineer.resumeText ? `${localEngineer.resumeText.substring(0, 100)}...` : 'No resumeText');
+      console.log('LocalEngineer all resume fields:', {
+        resumeUrl: localEngineer.resumeUrl,
+        resumeText: localEngineer.resumeText ? 'Has text' : 'No text'
+      });
+      
       onEngineerChange(localEngineer);
       // Pass localEngineer directly to the save callback instead of relying on selectedEngineer
-      onSave(localEngineer);
+      await onSave(localEngineer);
     }
   };
 
@@ -80,27 +279,6 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
     handleChange('skills', skillsArray);
   };
 
-  // AI推薦文生成機能
-  const generateRecommendation = () => {
-    toast.info('推薦文を生成中...', { duration: 2000 });
-    
-    setTimeout(() => {
-      // テンプレートに基づいて推薦文を生成
-      if (!localEngineer) return;
-      
-      const newText = recommendationTemplate
-        .replace('[名前]', `${localEngineer.name}さん`)
-        .replace('[スキル]', Array.isArray(localEngineer.skills) ? localEngineer.skills.slice(0, 2).join('と') : '')
-        .replace('[経験]', localEngineer.experience || '5')
-        .replace('[日本語レベル]', localEngineer.japaneseLevel || 'ビジネスレベル')
-        .replace('[得意分野]', localEngineer.workExperience || 'プロジェクト開発')
-        .replace('[ツール]', Array.isArray(localEngineer.skills) ? localEngineer.skills.slice(2).join('や') : '')
-        .replace('[備考]', localEngineer.remarks || '');
-        
-      handleChange('recommendation', newText);
-      toast.success('推薦文が生成されました');
-    }, 2000);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -361,6 +539,17 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="space-y-2">
+              <Label className="japanese-text">希望単価（万円/月）</Label>
+              <Input 
+                type="number"
+                value={localEngineer.desiredRate || ''}
+                onChange={(e) => handleChange('desiredRate', e.target.value)}
+                className="japanese-text"
+                placeholder="例: 60, 70"
+              />
+            </div>
           </div>
           
           <div className="space-y-2">
@@ -370,7 +559,7 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
               onChange={(e) => handleChange('selfPromotion', e.target.value)}
               className="japanese-text"
               rows={4}
-              placeholder="候補者の自己アピールを入力"
+              placeholder="技術者の自己アピールを入力"
             />
           </div>
           
@@ -385,42 +574,112 @@ export const CandidateEdit: React.FC<CandidateEditProps> = ({
             />
           </div>
           
+          {/* 履歴書ファイルセクション */}
           <div className="space-y-4 border-t pt-4">
-            <div className="flex justify-between items-center">
+            <Label className="japanese-text text-base font-medium">履歴書ファイル</Label>
+            
+            <div className="space-y-3">
+              {/* 既存ファイル表示 */}
+              {localEngineer.resumeUrl ? (
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium japanese-text">
+                        {(() => {
+                          console.log('=== Display File Name Debug ===');
+                          console.log('uploadedFileName:', uploadedFileName);
+                          console.log('localEngineer.resumeUrl:', localEngineer.resumeUrl);
+                          return uploadedFileName || '履歴書ファイル';
+                        })()}
+                      </p>
+                      <p className="text-xs text-gray-500 japanese-text">
+                        アップロード済み
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(localEngineer.resumeUrl, '_blank')}
+                      className="japanese-text"
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      表示
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFileDelete}
+                      className="japanese-text text-red-600 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      削除
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 japanese-text">
+                  履歴書ファイルはアップロードされていません
+                </div>
+              )}
+              
+              {/* ファイルアップロード - 履歴書がない場合のみ表示 */}
+              {!localEngineer.resumeUrl && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        type="file"
+                        accept=".xls,.xlsx"
+                        onChange={handleFileChange}
+                        disabled={isUploading}
+                        className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                        id="resume-file-input"
+                      />
+                      <div className="flex items-center justify-between p-2 border border-gray-300 rounded-md bg-white cursor-pointer hover:bg-gray-50">
+                        <span className="text-sm text-gray-600 japanese-text">
+                          {uploadedFile ? uploadedFile.name : 'ファイルを選択してください'}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="japanese-text ml-2"
+                          onClick={() => document.getElementById('resume-file-input')?.click()}
+                        >
+                          参照
+                        </Button>
+                      </div>
+                    </div>
+                    {isUploading && (
+                      <div className="flex items-center space-x-2 text-sm text-blue-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <span className="japanese-text">アップロード中...</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 japanese-text">
+                    Excel形式のファイル（.xls, .xlsx）のみ対応（最大10MB）
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div className="space-y-4 border-t pt-4">
+            <div className="space-y-2">
               <Label className="japanese-text text-base font-medium">推薦文</Label>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="japanese-text"
-                onClick={generateRecommendation}
-              >
-                <Wand2 className="mr-2 h-4 w-4" />
-                AI生成
-              </Button>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">推薦テンプレート</Label>
-              <Textarea 
-                value={recommendationTemplate}
-                onChange={(e) => setRecommendationTemplate(e.target.value)}
-                className="japanese-text text-sm"
-                rows={3}
-                placeholder="[名前]、[スキル]などのプレースホルダーを使用"
-              />
-              <p className="text-xs text-muted-foreground japanese-text">
-                プレースホルダー: [名前]、[スキル]、[経験]、[日本語レベル]、[得意分野]、[ツール]、[備考]
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="japanese-text">推薦文</Label>
               <Textarea 
                 value={localEngineer.recommendation || ''}
                 onChange={(e) => handleChange('recommendation', e.target.value)}
                 className="japanese-text"
                 rows={5}
-                placeholder="AIで生成するか、手動で入力してください"
+                placeholder="推薦文を入力してください"
               />
             </div>
           </div>
