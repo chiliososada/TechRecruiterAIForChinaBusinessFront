@@ -15,12 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EnhancedMatchingResult } from './types';
 import { toast } from 'sonner';
-import { Send, Pencil, Eye, EyeOff, User, Users } from 'lucide-react';
+import { Send, Pencil, Eye, EyeOff, User, Users, Paperclip, FileText, X, Plus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { sendIndividualEmail } from '@/utils/backend-api';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEmailTemplates } from '@/hooks/useEmailTemplates';
-import { emailTemplateService } from '@/services/emailTemplateService';
+import { emailTemplateService, EmailTemplate } from '@/services/emailTemplateService';
+import { attachmentService, AttachmentInfo } from '@/services/attachmentService';
+import { useEngineers } from '@/hooks/useEngineers';
 
 
 interface SendMessageDialogProps {
@@ -45,8 +46,54 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
   const [showSignature, setShowSignature] = useState(true);
   const [emailAddress, setEmailAddress] = useState('');
   const [isContactSelectOpen, setIsContactSelectOpen] = useState(false);
+  
+  // 添付ファイル関連の状態
+  const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState<Set<string>>(new Set());
+  
   const { user, currentTenant } = useAuth();
-  const { templates, loading: templatesLoading } = useEmailTemplates();
+  
+  // 技術者一覧を取得（履歴書添付用）
+  const { engineers: ownEngineers } = useEngineers('own');
+  const { engineers: otherEngineers } = useEngineers('other');
+  const allEngineers = [...ownEngineers, ...otherEngineers];
+  
+  // マッチした技術者を取得
+  const matchedEngineer = matchData ? allEngineers.find(engineer => engineer.id === matchData.candidateId) : null;
+  
+  // Custom hook to fetch templates with specific categories
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  
+  // Fetch templates with engineer_introduction and project_introduction categories
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!currentTenant?.id) return;
+      
+      setTemplatesLoading(true);
+      try {
+        const [engineerTemplates, projectTemplates] = await Promise.all([
+          emailTemplateService.getTemplatesByCategory(currentTenant.id, 'engineer_introduction'),
+          emailTemplateService.getTemplatesByCategory(currentTenant.id, 'project_introduction')
+        ]);
+        
+        // Combine both categories and remove duplicates
+        const combinedTemplates = [...engineerTemplates, ...projectTemplates];
+        const uniqueTemplates = combinedTemplates.filter((template, index, self) => 
+          index === self.findIndex(t => t.id === template.id)
+        );
+        
+        setTemplates(uniqueTemplates);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        toast.error("テンプレートの読み込みに失敗しました");
+      } finally {
+        setTemplatesLoading(false);
+      }
+    };
+    
+    fetchTemplates();
+  }, [currentTenant?.id]);
 
   // This useEffect will run whenever isOpen or matchData changes
   useEffect(() => {
@@ -134,6 +181,51 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
     }
   };
 
+  // 履歴書添付ハンドラー（マッチした技術者の履歴書を直接添付）
+  const handleAttachMatchedEngineerResume = async () => {
+    if (!currentTenant?.id || !matchedEngineer || !matchedEngineer.resume_url) {
+      toast.error('履歴書が見つかりません');
+      return;
+    }
+
+    // 既に同じエンジニアの履歴書が添付されているかチェック
+    const existingAttachment = attachments.find(att => att.engineerId === matchedEngineer.id);
+    if (existingAttachment) {
+      toast.warning(`${matchedEngineer.name}の履歴書は既に添付されています`);
+      return;
+    }
+
+    // アップロード開始
+    setUploadingAttachments(prev => new Set([...prev, matchedEngineer.id]));
+
+    try {
+      const attachmentInfo = await attachmentService.uploadResumeFromSupabase(
+        currentTenant.id,
+        matchedEngineer.id,
+        matchedEngineer.name,
+        matchedEngineer.resume_url
+      );
+
+      setAttachments(prev => [...prev, attachmentInfo]);
+      toast.success(`${matchedEngineer.name}の履歴書を添付しました`);
+    } catch (error) {
+      console.error('Resume attachment error:', error);
+      toast.error(error instanceof Error ? error.message : '履歴書の添付に失敗しました');
+    } finally {
+      setUploadingAttachments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(matchedEngineer.id);
+        return newSet;
+      });
+    }
+  };
+
+  // 添付ファイル削除ハンドラー
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== attachmentId));
+    toast.info('添付ファイルを削除しました');
+  };
+
   const handleSend = async () => {
     if (!subject.trim() || !message.trim()) {
       toast.error("エラー", {
@@ -164,40 +256,72 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
       // メッセージと署名を結合
       const fullMessage = showSignature && signature ? `${message}\n\n${signature}` : message;
       
-      // ユーザーコンテキストを作成
-      const userContext = {
-        tenant_id: currentTenant.id,
-        email: user?.email || ''
-      };
-
-      // APIを呼び出してメールを送信
-      const result = await sendIndividualEmail({
-        to_emails: [emailAddress],
-        subject: subject,
-        body_text: fullMessage,
-        body_html: fullMessage.replace(/\n/g, '<br>'),
-        priority: 5,
-        related_project_id: matchData.caseId?.toString(),
-        related_engineer_id: matchData.candidateId?.toString(),
-        metadata: {
-          matchingId: matchData.id,
-          caseName: matchData.caseName,
-          candidateName: matchData.candidateName,
-          matchingRate: matchData.matchingRate,
+      // 添付ファイルがある場合は添付ファイル付きメール送信を使用
+      if (attachments.length > 0) {
+        const attachmentIds = attachments.map(att => att.id);
+        const attachmentFilenames = attachments.map(att => att.filename);
+        
+        const result = await attachmentService.sendEmailWithAttachments(
+          currentTenant.id,
+          {
+            to: [emailAddress],
+            subject: subject,
+            body: message, // 署名は service で処理される
+            signature: showSignature ? signature : undefined
+          },
+          attachmentIds,
+          attachmentFilenames
+        );
+        
+        setSending(false);
+        
+        if (result.status === 'success') {
+          toast.success("送信完了", {
+            description: `添付ファイル付きメールが正常に送信されました（キューID: ${result.queue_id}）`,
+          });
+          onClose();
+        } else {
+          toast.error("送信失敗", {
+            description: result.message || "メール送信に失敗しました",
+          });
         }
-      }, userContext);
-
-      setSending(false);
-
-      if (result.success) {
-        toast.success("送信完了", {
-          description: result.message || "メールが正常に送信されました",
-        });
-        onClose();
       } else {
-        toast.error("送信失敗", {
-          description: result.message || "メール送信に失敗しました",
-        });
+        // 通常のメール送信（添付ファイルなし）
+        // ユーザーコンテキストを作成
+        const userContext = {
+          tenant_id: currentTenant.id,
+          email: user?.email || ''
+        };
+
+        // APIを呼び出してメールを送信
+        const result = await sendIndividualEmail({
+          to_emails: [emailAddress],
+          subject: subject,
+          body_text: fullMessage,
+          body_html: fullMessage.replace(/\n/g, '<br>'),
+          priority: 5,
+          related_project_id: matchData.caseId?.toString(),
+          related_engineer_id: matchData.candidateId?.toString(),
+          metadata: {
+            matchingId: matchData.id,
+            caseName: matchData.caseName,
+            candidateName: matchData.candidateName,
+            matchingRate: matchData.matchingRate,
+          }
+        }, userContext);
+
+        setSending(false);
+
+        if (result.success) {
+          toast.success("送信完了", {
+            description: result.message || "メールが正常に送信されました",
+          });
+          onClose();
+        } else {
+          toast.error("送信失敗", {
+            description: result.message || "メール送信に失敗しました",
+          });
+        }
       }
     } catch (error) {
       setSending(false);
@@ -316,6 +440,75 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* 技術者履歴書添付ボタン */}
+              <div className="space-y-2">
+                {matchedEngineer && matchedEngineer.resume_url ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAttachMatchedEngineerResume}
+                    disabled={uploadingAttachments.has(matchedEngineer.id) || attachments.some(att => att.engineerId === matchedEngineer.id)}
+                    className="w-full japanese-text flex items-center justify-center gap-2"
+                  >
+                    {uploadingAttachments.has(matchedEngineer.id) ? (
+                      <>
+                        <Paperclip className="h-4 w-4 animate-spin" />
+                        履歴書添付中...
+                      </>
+                    ) : attachments.some(att => att.engineerId === matchedEngineer.id) ? (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        履歴書添付済み
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        技術者履歴書を添付
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground japanese-text py-2">
+                    該技術者履歴書がありません
+                  </div>
+                )}
+              </div>
+
+              {/* 添付ファイル一覧 */}
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium japanese-text">添付ファイル</label>
+                  <div className="border rounded-md p-2 bg-muted/30">
+                    {attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between py-1 px-2 hover:bg-muted/50 rounded"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-green-600" />
+                          <div className="text-sm">
+                            <p className="font-medium japanese-text">{attachment.filename}</p>
+                            {attachment.engineerName && (
+                              <p className="text-xs text-muted-foreground japanese-text">
+                                {attachment.engineerName}の履歴書
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          className="h-6 w-6 p-0 hover:bg-red-100"
+                        >
+                          <X className="h-3 w-3 text-red-600" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div>
                 <label htmlFor="recipient" className="text-sm font-medium japanese-text flex justify-between">
@@ -499,6 +692,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </>
   );
 };
