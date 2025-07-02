@@ -1,4 +1,4 @@
-import { Engineer } from '../types';
+import { Engineer } from '@/components/candidates/types';
 import { EmailTemplate } from '../hooks/useEmailTemplates';
 
 /**
@@ -85,12 +85,7 @@ const extractMainSkills = (engineers: Engineer[]): string => {
   const allSkills = new Set<string>();
   
   engineers.forEach(engineer => {
-    const skills = Array.isArray(engineer.skills) 
-      ? engineer.skills 
-      : typeof engineer.skills === 'string' 
-        ? engineer.skills.split(',').map(s => s.trim())
-        : [];
-    
+    const skills = engineer.skills || [];
     skills.forEach(skill => allSkills.add(skill));
   });
   
@@ -173,12 +168,7 @@ const generateCategorizedEngineerList = (engineers: Engineer[]): string => {
   const categories: Record<string, Engineer[]> = {};
   
   engineers.forEach(engineer => {
-    const skills = Array.isArray(engineer.skills) 
-      ? engineer.skills 
-      : typeof engineer.skills === 'string' 
-        ? engineer.skills.split(',').map(s => s.trim())
-        : [];
-    
+    const skills = engineer.skills || [];
     const mainSkill = skills[0] || 'その他';
     const category = determineSkillCategory(mainSkill);
     
@@ -218,11 +208,9 @@ const determineSkillCategory = (skill: string): string => {
 /**
  * Format skills for display
  */
-const formatSkills = (skills: string[] | string | undefined): string => {
-  if (Array.isArray(skills)) {
+const formatSkills = (skills: string[] | undefined): string => {
+  if (skills && Array.isArray(skills)) {
     return skills.join(', ');
-  } else if (typeof skills === 'string') {
-    return skills;
   }
   return '';
 };

@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Engineer } from '@/components/cases/email/types'; // Use our local Engineer type
+import { Badge } from '@/components/ui/badge';
+import { FileText } from 'lucide-react';
+import { Engineer } from '@/components/candidates/types'; // Use the candidates Engineer type
 import { useEngineers } from '@/hooks/useEngineers';
 import { transformDatabaseToUIEngineer } from '@/utils/engineerDataTransform';
 
@@ -51,9 +53,9 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
     
     const matchesSearch = !searchQuery || 
       engineer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(engineer.skills) 
-        ? engineer.skills.some(skill => typeof skill === 'string' && skill.toLowerCase().includes(searchQuery.toLowerCase()))
-        : typeof engineer.skills === 'string' && engineer.skills.toLowerCase().includes(searchQuery.toLowerCase()));
+      (engineer.skills && Array.isArray(engineer.skills) 
+        ? engineer.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()))
+        : false);
     
     return matchesCompanyType && matchesSearch;
   });
@@ -65,8 +67,6 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
       name: engineer.name,
       skills: engineer.skills || [],
       experience: engineer.experience,
-      currentStatus: engineer.currentStatus,
-      company: engineer.company,
       status: engineer.status,
       japaneseLevel: engineer.japaneseLevel,
       availability: engineer.availability,
@@ -91,7 +91,10 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
       workExperience: engineer.workExperience,
       registeredAt: engineer.registeredAt,
       updatedAt: engineer.updatedAt,
-      isActive: engineer.isActive
+      resumeUrl: engineer.resumeUrl,
+      resumeText: engineer.resumeText,
+      managerName: engineer.managerName,
+      managerEmail: engineer.managerEmail
     };
     onSelect(selectedEngineer);
     onClose();
@@ -141,26 +144,27 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
                 <TableHead className="japanese-text">スキル</TableHead>
                 <TableHead className="japanese-text">所属</TableHead>
                 <TableHead className="japanese-text">会社名</TableHead>
+                <TableHead className="japanese-text">履歴書</TableHead>
                 <TableHead className="w-24 text-right"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 japanese-text">
+                  <TableCell colSpan={6} className="text-center py-8 japanese-text">
                     技術者データを読み込み中...
                   </TableCell>
                 </TableRow>
               ) : filteredEngineers.length === 0 ? (
                 allEngineers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 japanese-text">
+                    <TableCell colSpan={6} className="text-center py-8 japanese-text">
                       技術者データが見つかりません。データベースに技術者情報を登録してください。
                     </TableCell>
                   </TableRow>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-4 japanese-text">
+                    <TableCell colSpan={6} className="text-center py-4 japanese-text">
                       検索条件に一致する技術者がいません
                     </TableCell>
                   </TableRow>
@@ -177,6 +181,16 @@ export function EngineerSelectionDialog({ isOpen, onClose, onSelect }: EngineerS
                     <TableCell className="japanese-text">{engineer.companyType}</TableCell>
                     <TableCell className="japanese-text">
                       {engineer.companyType === '他社' ? engineer.companyName : '-'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {engineer.resumeUrl ? (
+                        <Badge variant="secondary" className="text-xs">
+                          <FileText className="h-3 w-3 mr-1" />
+                          あり
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">なし</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button 

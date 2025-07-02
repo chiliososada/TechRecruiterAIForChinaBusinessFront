@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AttachmentInfo } from '@/services/attachmentService';
 
 interface EmailSenderLayoutProps {
   emailState: {
@@ -36,6 +37,11 @@ interface EmailSenderLayoutProps {
   applyEngineerToTemplate: () => void; // Changed to match the required signature
   isOtherCompanyMode: boolean;
   handleUnselectCase: (caseId: string, rowId: string) => void;
+  // 添付ファイル関連
+  attachments?: AttachmentInfo[];
+  uploadingAttachments?: Set<string>;
+  onAttachResume?: (engineerId: string, engineerName: string, resumeUrl: string) => Promise<void>;
+  onRemoveAttachment?: (attachmentId: string) => void;
 }
 
 export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
@@ -51,7 +57,12 @@ export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
   removeSelectedEngineer,
   applyEngineerToTemplate,
   isOtherCompanyMode,
-  handleUnselectCase
+  handleUnselectCase,
+  // 添付ファイル関連
+  attachments = [],
+  uploadingAttachments = new Set(),
+  onAttachResume,
+  onRemoveAttachment
 }) => {
   // Group selected cases by company for better organization
   const selectedSendersByCompany = React.useMemo(() => {
@@ -178,6 +189,8 @@ export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
           sending={emailState.sending}
           selectedCasesCount={totalSelectedSenders}
           hideOptimizationSection={isOtherCompanyMode}
+          attachments={attachments}
+          onRemoveAttachment={onRemoveAttachment}
         />
 
         {/* 技術者選択部分 - メールフォームの下に移動 */}
@@ -188,6 +201,9 @@ export const EmailSenderLayout: React.FC<EmailSenderLayoutProps> = ({
             removeSelectedEngineer={removeSelectedEngineer}
             applyEngineerToTemplate={applyEngineerToTemplate}
             selectedCasesLength={totalSelectedSenders}
+            attachments={attachments}
+            onAttachResume={onAttachResume || (async () => {})}
+            uploadingAttachments={uploadingAttachments}
           />
         </div>
       </div>

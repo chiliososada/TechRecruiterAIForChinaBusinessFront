@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Engineer } from '../types';
+import { Engineer } from '@/components/candidates/types';
 import { toast } from 'sonner';
 
 export const useEngineerState = (mailCases: any[] = []) => {

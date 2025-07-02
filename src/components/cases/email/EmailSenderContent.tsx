@@ -13,6 +13,7 @@ import { EmailSenderLayout } from './EmailSenderLayout';
 import { FilterBar } from './FilterBar';
 import { MailCase } from './types';
 import { EmailTemplate } from './hooks/useEmailTemplates';
+import { AttachmentInfo } from '@/services/attachmentService';
 import { Input } from '@/components/ui/input';
 import { Search, Building } from 'lucide-react';
 import { CaseViewDialog } from '../detail/CaseViewDialog';
@@ -64,7 +65,13 @@ interface EmailSenderContentProps {
     engineerHandleApply: () => void; // This now expects no parameters
     handleUnselectCase: (caseId: string, rowId: string) => void;
     handleSort?: (field: string, direction: 'asc' | 'desc') => void;
+    // 添付ファイル関連のハンドラー
+    handleAttachResume?: (engineerId: string, engineerName: string, resumeUrl: string) => Promise<void>;
+    handleRemoveAttachment?: (attachmentId: string) => void;
   };
+  // 添付ファイル関連のプロパティ
+  attachments?: AttachmentInfo[];
+  uploadingAttachments?: Set<string>;
 }
 
 export const EmailSenderContent: React.FC<EmailSenderContentProps> = ({
@@ -74,7 +81,9 @@ export const EmailSenderContent: React.FC<EmailSenderContentProps> = ({
   caseData,
   templates,
   templatesLoading,
-  handlers
+  handlers,
+  attachments = [],
+  uploadingAttachments = new Set()
 }) => {
   const [companySearchTerm, setCompanySearchTerm] = React.useState('');
   const [selectedCase, setSelectedCase] = React.useState<MailCase | null>(null);
@@ -202,6 +211,10 @@ export const EmailSenderContent: React.FC<EmailSenderContentProps> = ({
             applyEngineerToTemplate={handlers.engineerHandleApply}
             isOtherCompanyMode={isOtherCompanyMode}
             handleUnselectCase={handleUnselectCase}
+            attachments={attachments}
+            uploadingAttachments={uploadingAttachments}
+            onAttachResume={handlers.handleAttachResume}
+            onRemoveAttachment={handlers.handleRemoveAttachment}
           />
         </CardContent>
       </Card>

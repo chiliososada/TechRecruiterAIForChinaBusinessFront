@@ -344,16 +344,24 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       // 添付ファイルがある場合は添付ファイル付きメール送信を使用
       if (attachments.length > 0) {
         const attachmentIds = attachments.map(att => att.id);
-        await attachmentService.sendEmailWithAttachments(
+        const attachmentFilenames = attachments.map(att => att.filename);
+        const result = await attachmentService.sendEmailWithAttachments(
           currentTenant!.id,
           {
             to: toEmails,
             subject: emailState.subject,
-            body: fullBody,
+            body: emailState.emailBody, // Use emailBody directly since signature is handled in the service
             signature: emailState.signature
           },
-          attachmentIds
+          attachmentIds,
+          attachmentFilenames
         );
+        
+        if (result.status === 'success') {
+          toast.success(`${toEmails.length}名に添付ファイル付きメールを送信しました（キューID: ${result.queue_id}）`);
+        } else {
+          toast.error(result.message || 'メール送信に失敗しました');
+        }
       } else {
         // 通常のメール送信
         const result = await sendIndividualEmail({
@@ -489,9 +497,7 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
           startDateOptions: startDateOptions
         }}
         engineerState={{
-          ...engineerState,
-          attachments,
-          uploadingAttachments
+          selectedEngineers: engineerState.selectedEngineers
         }}
         caseData={{
           paginatedCases,
@@ -501,6 +507,8 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
         templates={templates}
         templatesLoading={templatesLoading}
         handlers={handlers}
+        attachments={attachments}
+        uploadingAttachments={uploadingAttachments}
       />
       
       <EngineerSelectionDialog

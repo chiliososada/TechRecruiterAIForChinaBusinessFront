@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Search, UserPlus, User, Paperclip, Loader } from 'lucide-react';
-import { Engineer } from './types'; // Fixed the import path
+import { Engineer } from '@/components/candidates/types'; // Use the candidates Engineer type
 import { AttachmentInfo } from '@/services/attachmentService';
 
 interface EngineerSelectionProps {
@@ -68,7 +68,7 @@ export const EngineerSelection: React.FC<EngineerSelectionProps> = ({
                   <p className="text-sm font-medium japanese-text">{engineer.name}</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-muted-foreground japanese-text">
-                      {Array.isArray(engineer.skills) ? engineer.skills.join(", ") : engineer.skills} | {engineer.experience}
+                      {Array.isArray(engineer.skills) ? engineer.skills.join(", ") : engineer.skills || ''} | {engineer.experience}
                     </p>
                     {Array.isArray(engineer.status) && engineer.status.length > 0 ? (
                       <Badge variant={getBadgeVariant(engineer.status[0]) as any} className="text-xs">
