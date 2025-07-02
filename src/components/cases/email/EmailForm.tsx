@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmailTemplate } from './hooks/useEmailTemplates';
-import { MailCheck, Send, Sparkles, MailPlus, Pencil, Eye, EyeOff } from 'lucide-react';
+import { MailCheck, Send, Sparkles, MailPlus, Pencil, Eye, EyeOff, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { AttachmentInfo } from '@/services/attachmentService';
 
 interface EmailFormProps {
   emailTemplates: EmailTemplate[];
@@ -27,6 +28,9 @@ interface EmailFormProps {
   sending: boolean;
   selectedCasesCount: number;
   hideOptimizationSection?: boolean;
+  // 添付ファイル関連
+  attachments?: AttachmentInfo[];
+  onRemoveAttachment?: (attachmentId: string) => void;
 }
 
 export function EmailForm({
@@ -45,7 +49,10 @@ export function EmailForm({
   handleTestEmail,
   sending,
   selectedCasesCount,
-  hideOptimizationSection = false
+  hideOptimizationSection = false,
+  // 添付ファイル関連
+  attachments = [],
+  onRemoveAttachment
 }: EmailFormProps) {
   // Ensure selectedTemplate is never undefined or null
   const safeSelectedTemplate = selectedTemplate || "";
@@ -135,6 +142,43 @@ export function EmailForm({
                 placeholder="メールの件名を入力してください" 
               />
             </div>
+
+            {/* 添付ファイル表示 */}
+            {attachments && attachments.length > 0 && (
+              <div className="space-y-2">
+                <Label className="japanese-text">添付ファイル</Label>
+                <div className="border rounded-md p-2 bg-muted/30">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center justify-between py-1 px-2 hover:bg-muted/50 rounded"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4 text-green-600" />
+                        <div className="text-sm">
+                          <p className="font-medium japanese-text">{attachment.filename}</p>
+                          {attachment.engineerName && (
+                            <p className="text-xs text-muted-foreground japanese-text">
+                              {attachment.engineerName}の履歴書
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {onRemoveAttachment && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRemoveAttachment(attachment.id)}
+                          className="h-6 w-6 p-0 hover:bg-red-100"
+                        >
+                          <X className="h-3 w-3 text-red-600" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div className="space-y-2">
               <Label htmlFor="email-body" className="japanese-text">本文</Label>

@@ -78,6 +78,7 @@ export interface Engineer {
   registeredAt?: string;
   updatedAt?: string;
   isActive?: boolean; // Add the isActive property to match database structure
+  resumeUrl?: string; // 履歴書ファイルのURL
 }
 
 // Define EmailTemplate interface

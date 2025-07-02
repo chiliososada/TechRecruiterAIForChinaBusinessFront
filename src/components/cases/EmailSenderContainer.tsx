@@ -12,6 +12,7 @@ import { MailCase } from './email/types';
 import { sendTestEmail, sendIndividualEmail } from '@/utils/backend-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailTemplateService } from '@/services/emailTemplateService';
+import { attachmentService, AttachmentInfo } from '@/services/attachmentService';
 
 interface EmailSenderContainerProps {
   mailCases: MailCase[];  // This receives filtered cases from the parent component
@@ -30,6 +31,10 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
   
   // Force re-render key to ensure EmailForm shows compose tab when container mounts
   const [mountKey] = useState(() => `email-container-${Date.now()}`);
+  
+  // 添付ファイル関連の状態
+  const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState<Set<string>>(new Set());
   
   // Log the incoming mailCases to debug
   useEffect(() => {
@@ -249,6 +254,51 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       toast.success('メール本文が最適化されました');
     }, 1500);
   };
+
+  // 履歴書添付機能
+  const handleAttachResume = async (engineerId: string, engineerName: string, resumeUrl: string) => {
+    if (!currentTenant?.id) {
+      toast.error('テナント情報が見つかりません');
+      return;
+    }
+
+    // 既に同じエンジニアの履歴書が添付されているかチェック
+    const existingAttachment = attachments.find(att => att.engineerId === engineerId);
+    if (existingAttachment) {
+      toast.warning(`${engineerName}の履歴書は既に添付されています`);
+      return;
+    }
+
+    // アップロード開始
+    setUploadingAttachments(prev => new Set([...prev, engineerId]));
+
+    try {
+      const attachmentInfo = await attachmentService.uploadResumeFromSupabase(
+        currentTenant.id,
+        engineerId,
+        engineerName,
+        resumeUrl
+      );
+
+      setAttachments(prev => [...prev, attachmentInfo]);
+      toast.success(`${engineerName}の履歴書を添付しました`);
+    } catch (error) {
+      console.error('Resume attachment error:', error);
+      toast.error(error instanceof Error ? error.message : '履歴書の添付に失敗しました');
+    } finally {
+      setUploadingAttachments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(engineerId);
+        return newSet;
+      });
+    }
+  };
+
+  // 添付ファイル削除機能
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== attachmentId));
+    toast.info('添付ファイルを削除しました');
+  };
   
   const handleSendEmail = async () => {
     if (emailState.selectedCases.length === 0) {
@@ -291,31 +341,48 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
       // Prepare email content with signature if provided
       const fullBody = emailState.signature ? `${emailState.emailBody}\n\n${emailState.signature}` : emailState.emailBody;
 
-      const result = await sendIndividualEmail({
-        to_emails: toEmails,
-        subject: emailState.subject,
-        body_text: fullBody,
-        body_html: fullBody.replace(/\n/g, '<br>'), // Simple text to HTML conversion
-        metadata: {
-          case_count: emailState.selectedCases.length,
-          project_ids: relatedProjectIds,
-          engineer_ids: engineerState.selectedEngineers.map(eng => eng.id),
-          sent_from: 'bulk_email_interface'
-        }
-      }, user);
-
-      if (result.success) {
-        toast.success(`${toEmails.length}名にメールを送信しました（キューID: ${result.data?.queue_id}）`);
-        
-        // Clear form after successful send
-        emailState.setSelectedCases([]);
-        emailState.setSelectAll(false);
-        emailState.setSubject('');
-        emailState.setEmailBody('');
-        engineerState.setSelectedEngineers([]);
+      // 添付ファイルがある場合は添付ファイル付きメール送信を使用
+      if (attachments.length > 0) {
+        const attachmentIds = attachments.map(att => att.id);
+        await attachmentService.sendEmailWithAttachments(
+          currentTenant!.id,
+          {
+            to: toEmails,
+            subject: emailState.subject,
+            body: fullBody,
+            signature: emailState.signature
+          },
+          attachmentIds
+        );
       } else {
-        toast.error(result.message || 'メール送信に失敗しました');
+        // 通常のメール送信
+        const result = await sendIndividualEmail({
+          to_emails: toEmails,
+          subject: emailState.subject,
+          body_text: fullBody,
+          body_html: fullBody.replace(/\n/g, '<br>'), // Simple text to HTML conversion
+          metadata: {
+            case_count: emailState.selectedCases.length,
+            project_ids: relatedProjectIds,
+            engineer_ids: engineerState.selectedEngineers.map(eng => eng.id),
+            sent_from: 'bulk_email_interface'
+          }
+        }, user);
+
+        if (result.success) {
+          toast.success(`${toEmails.length}名にメールを送信しました（キューID: ${result.data?.queue_id}）`);
+        } else {
+          toast.error(result.message || 'メール送信に失敗しました');
+        }
       }
+
+      // Clear form after successful send (for both attachment and regular emails)
+      emailState.setSelectedCases([]);
+      emailState.setSelectAll(false);
+      emailState.setSubject('');
+      emailState.setEmailBody('');
+      engineerState.setSelectedEngineers([]);
+      setAttachments([]); // Clear attachments
     } catch (error) {
       console.error('Email send error:', error);
       toast.error('メール送信中にエラーが発生しました');
@@ -406,7 +473,10 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
     engineerHandleRemove: engineerState.removeEngineer,
     engineerHandleApply: engineerHandleApply, // Use our adapter function
     handleUnselectCase: emailState.handleUnselectCase,
-    handleSort: handleSort
+    handleSort: handleSort,
+    // 添付ファイル関連のハンドラー
+    handleAttachResume: handleAttachResume,
+    handleRemoveAttachment: handleRemoveAttachment
   };
   
   return (
@@ -418,7 +488,11 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
           ...emailState,
           startDateOptions: startDateOptions
         }}
-        engineerState={engineerState}
+        engineerState={{
+          ...engineerState,
+          attachments,
+          uploadingAttachments
+        }}
         caseData={{
           paginatedCases,
           totalPages,

@@ -3,8 +3,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserPlus, User } from 'lucide-react';
+import { Search, UserPlus, User, Paperclip, Loader } from 'lucide-react';
 import { Engineer } from './types'; // Fixed the import path
+import { AttachmentInfo } from '@/services/attachmentService';
 
 interface EngineerSelectionProps {
   selectedEngineers: Engineer[];
@@ -12,6 +13,10 @@ interface EngineerSelectionProps {
   removeSelectedEngineer: (engineerId: string) => void;
   applyEngineerToTemplate: () => void;
   selectedCasesLength: number;
+  // 添付ファイル関連
+  attachments: AttachmentInfo[];
+  onAttachResume: (engineerId: string, engineerName: string, resumeUrl: string) => Promise<void>;
+  uploadingAttachments: Set<string>; // 現在アップロード中のエンジニアIDのセット
 }
 
 export const EngineerSelection: React.FC<EngineerSelectionProps> = ({
@@ -19,7 +24,11 @@ export const EngineerSelection: React.FC<EngineerSelectionProps> = ({
   openEngineerDialog,
   removeSelectedEngineer,
   applyEngineerToTemplate,
-  selectedCasesLength
+  selectedCasesLength,
+  // 添付ファイル関連
+  attachments,
+  onAttachResume,
+  uploadingAttachments
 }) => {
   // Updated helper function to determine badge color based on status
   const getBadgeVariant = (status: string) => {
@@ -79,14 +88,33 @@ export const EngineerSelection: React.FC<EngineerSelectionProps> = ({
                   </div>
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => removeSelectedEngineer(engineer.id)}
-                className="h-8 w-8 p-0"
-              >
-                &times;
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* 履歴書添付ボタン */}
+                {engineer.resumeUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onAttachResume(engineer.id, engineer.name, engineer.resumeUrl!)}
+                    disabled={uploadingAttachments.has(engineer.id)}
+                    className="h-8 px-2"
+                    title="履歴書を添付"
+                  >
+                    {uploadingAttachments.has(engineer.id) ? (
+                      <Loader className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Paperclip className="h-3 w-3" />
+                    )}
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => removeSelectedEngineer(engineer.id)}
+                  className="h-8 w-8 p-0"
+                >
+                  &times;
+                </Button>
+              </div>
             </div>
           ))}
 
