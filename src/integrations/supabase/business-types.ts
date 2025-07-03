@@ -234,6 +234,52 @@ export interface ProjectEngineerMatchRow {
     deleted_at: string | null
 }
 
+// 批量邮件联系人表类型定义
+export interface BulkEmailContactRow {
+    id: string
+    company_name: string
+    contact_name: string
+    contact_email: string
+    contact_position: string | null
+    group_id: string | null
+    group_name: string
+    group_color: string
+    notes: string | null
+    tenant_id: string
+    is_active: boolean
+    created_at: string | null
+}
+
+export interface BulkEmailContactInsert {
+    id?: string
+    company_name: string
+    contact_name: string
+    contact_email: string
+    contact_position?: string | null
+    group_id?: string | null
+    group_name?: string
+    group_color?: string
+    notes?: string | null
+    tenant_id: string
+    is_active?: boolean
+    created_at?: string | null
+}
+
+export interface BulkEmailContactUpdate {
+    id?: string
+    company_name?: string
+    contact_name?: string
+    contact_email?: string
+    contact_position?: string | null
+    group_id?: string | null
+    group_name?: string
+    group_color?: string
+    notes?: string | null
+    tenant_id?: string
+    is_active?: boolean
+    created_at?: string | null
+}
+
 // 其他類型定義...
 export type TenantType = "personal" | "enterprise"
 export type UserRole = "owner" | "admin" | "member" | "viewer" | "test_user" | "developer" | "manager"

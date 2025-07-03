@@ -2424,6 +2424,59 @@ export type Database = {
           },
         ]
       }
+      bulk_email_contacts: {
+        Row: {
+          id: string
+          company_name: string
+          contact_name: string
+          contact_email: string
+          contact_position: string | null
+          group_id: string | null
+          group_name: string
+          group_color: string
+          notes: string | null
+          tenant_id: string
+          is_active: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          contact_name: string
+          contact_email: string
+          contact_position?: string | null
+          group_id?: string | null
+          group_name?: string
+          group_color?: string
+          notes?: string | null
+          tenant_id: string
+          is_active?: boolean
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          contact_name?: string
+          contact_email?: string
+          contact_position?: string | null
+          group_id?: string | null
+          group_name?: string
+          group_color?: string
+          notes?: string | null
+          tenant_id?: string
+          is_active?: boolean
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_email_contacts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
