@@ -142,7 +142,7 @@ export function LoginForm({ onGoogleLogin }: LoginFormProps) {
           </Button>
 
           {/* Google ログインボタン（将来の拡張用） */}
-          {onGoogleLogin && (
+          {/* {onGoogleLogin && (
             <>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -183,7 +183,7 @@ export function LoginForm({ onGoogleLogin }: LoginFormProps) {
                 Googleでログイン
               </Button>
             </>
-          )}
+          )} */}
         </form>
 
         {/* パスワード忘れリンク（将来の拡張用） */}

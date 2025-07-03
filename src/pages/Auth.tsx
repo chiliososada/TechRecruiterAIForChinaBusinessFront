@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { RegisterForm } from '@/components/auth/RegisterForm';
+// import { RegisterForm } from '@/components/auth/RegisterForm';
 import { AuthLoader } from '@/components/auth/AuthLoader';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
@@ -63,36 +63,24 @@ export function Auth() {
           <AuthHeader />
 
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="login" className="japanese-text">
                 ログイン
               </TabsTrigger>
-              <TabsTrigger value="register" className="japanese-text">
+              {/* <TabsTrigger value="register" className="japanese-text">
                 アカウント登録
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
 
             <TabsContent value="login">
               <LoginForm onGoogleLogin={signInWithGoogle} />
             </TabsContent>
 
-            <TabsContent value="register">
+            {/* <TabsContent value="register">
               <RegisterForm onGoogleLogin={signInWithGoogle} />
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
         </Card>
-
-        {/* 開発環境での情報表示 */}
-        {import.meta.env.DEV && (
-          <div className="mt-4 p-4 bg-muted rounded-lg">
-            <h3 className="font-semibold mb-2 japanese-text">開発情報</h3>
-            <div className="text-sm space-y-1 japanese-text">
-              <p>リダイレクト先: {from}</p>
-              <p>認証システム: identity-hub-control</p>
-              <p>現在のURL: {window.location.href}</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

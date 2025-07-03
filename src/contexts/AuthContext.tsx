@@ -254,7 +254,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('ユーザー情報の詳細:', {
         userInfo_tenant_id: userInfo.tenant_id,
         tenantInfo_id: tenantInfo?.id,
-        tenantInfo_full: tenantInfo
+        tenantInfo_full: tenantInfo,
+        authData_keys: Object.keys(authData),
+        userInfo_keys: Object.keys(userInfo || {}),
+        tenantInfo_keys: Object.keys(tenantInfo || {})
       });
 
       // ユーザー情報の設定
@@ -307,6 +310,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           contact_email: tenantInfo.contact_email,
           contact_phone: tenantInfo.contact_phone,
         };
+      } else if (userInfo.tenant_id) {
+        // テナント情報がない場合、デフォルトテナントを作成
+        console.warn('テナント情報がレスポンスに含まれていません。デフォルトテナントを作成します');
+        tenantData = {
+          id: userInfo.tenant_id,
+          name: 'デフォルトテナント',
+          tenant_type: 'personal',
+          is_active: true,
+        };
+      } else {
+        console.error('ユーザー情報にテナントIDがありません');
       }
 
       // 状態の更新

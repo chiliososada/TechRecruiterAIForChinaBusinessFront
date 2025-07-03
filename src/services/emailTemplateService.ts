@@ -6,27 +6,7 @@ export interface EmailTemplate {
   tenant_id: string;
   name: string;
   description?: string;
-  category: string;
-  subject_template: string;
-  body_template_text: string;
-  body_template_html?: string;
-  signature_template?: string;
-  available_placeholders: string[];
-  required_placeholders: string[];
-  ai_summary_enabled: boolean;
-  is_active: boolean;
-  usage_count: number;
-  last_used_at?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string;
-}
-
-export interface CreateEmailTemplateRequest {
-  name: string;
-  description?: string;
-  category: string;
+  category?: string;
   subject_template: string;
   body_template_text: string;
   body_template_html?: string;
@@ -34,6 +14,42 @@ export interface CreateEmailTemplateRequest {
   available_placeholders?: string[];
   required_placeholders?: string[];
   ai_summary_enabled?: boolean;
+  is_active?: boolean;
+  usage_count?: number;
+  last_used_at?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  
+  // 新增：多技术者模板字段
+  multi_engineer_format?: string;
+  engineer_block_template?: string;
+  table_header_template?: string;
+  table_row_template?: string;
+  summary_block_template?: string;
+  category_block_template?: string;
+}
+
+export interface CreateEmailTemplateRequest {
+  name: string;
+  description?: string;
+  category?: string;
+  subject_template: string;
+  body_template_text: string;
+  body_template_html?: string;
+  signature_template?: string;
+  available_placeholders?: string[];
+  required_placeholders?: string[];
+  ai_summary_enabled?: boolean;
+  
+  // 新增：多技术者模板字段
+  multi_engineer_format?: string;
+  engineer_block_template?: string;
+  table_header_template?: string;
+  table_row_template?: string;
+  summary_block_template?: string;
+  category_block_template?: string;
 }
 
 export interface UpdateEmailTemplateRequest extends Partial<CreateEmailTemplateRequest> {
@@ -272,7 +288,7 @@ class EmailTemplateService {
       const { error } = await client
         .from('email_templates')
         .update({
-          usage_count: client.raw('usage_count + 1'),
+        
           last_used_at: new Date().toISOString(),
         })
         .eq('id', templateId)

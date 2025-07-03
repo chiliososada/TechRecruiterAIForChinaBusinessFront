@@ -454,8 +454,20 @@ export const useEngineers = (companyType: 'own' | 'other') => {
   // 初始化时获取数据
   useEffect(() => {
     console.log('useEngineers effect triggered - currentTenant:', currentTenant?.id, 'companyType:', companyType);
+    console.log('useEngineers effect - tenant details:', {
+      hasTenant: !!currentTenant,
+      tenantId: currentTenant?.id,
+      tenantName: currentTenant?.name,
+      isAuthenticated: businessClientManager.isAuthenticated()
+    });
+    
     if (currentTenant && businessClientManager.isAuthenticated()) {
       fetchEngineers();
+    } else {
+      console.log('useEngineers - 条件が満たされていません:', {
+        currentTenant: !!currentTenant,
+        isAuthenticated: businessClientManager.isAuthenticated()
+      });
     }
   }, [currentTenant, companyType, businessClientManager.isAuthenticated()]);
 
