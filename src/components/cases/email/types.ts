@@ -42,6 +42,8 @@ export interface MailCase {
   priority?: string;
   source?: string;
   receivedDate?: string;
+  japaneseLevel?: string;
+  maxCandidates?: number;
 }
 
 export interface Engineer {
@@ -79,6 +81,7 @@ export interface Engineer {
   updatedAt?: string;
   isActive?: boolean; // Add the isActive property to match database structure
   resumeUrl?: string; // 履歴書ファイルのURL
+  desiredRate?: string; // 希望単価
 }
 
 // Define EmailTemplate interface
