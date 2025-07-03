@@ -1,73 +1,151 @@
-# Welcome to your Lovable project
+# Tech Recruiter AI - 技術者採用管理システム
 
-## Project info
+## 概要
 
-**URL**: https://lovable.dev/projects/4931c54a-ae4d-44e6-b58d-d89f3e9ae05f
+Tech Recruiter AIは、技術者採用業務を効率化するための包括的な管理システムです。AIを活用した人材と案件のマッチング機能により、最適な人材配置を実現します。
 
-## How can I edit this code?
+## 主な機能
 
-There are several ways of editing your application.
+### 1. 案件管理
+- **自社案件・他社案件の分離管理**: 案件タイプに応じた効率的な管理
+- **詳細な案件情報管理**: スキル要件、予算、期間、日本語レベルなど
+- **ステータス管理**: 募集中、進行中、完了などの状態管理
+- **一括メール送信**: 複数の候補者への効率的な連絡
 
-**Use Lovable**
+### 2. 人材管理
+- **エンジニア情報の一元管理**: スキル、経験、資格情報などの管理
+- **履歴書管理**: PDFファイルのアップロードと管理
+- **ステータス追跡**: 利用可能、稼働中などの状態管理
+- **詳細な検索・フィルタリング**: 多様な条件での人材検索
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4931c54a-ae4d-44e6-b58d-d89f3e9ae05f) and start prompting.
+### 3. AIマッチング機能
+- **案件→人材マッチング**: 案件に最適な人材を自動推薦
+- **人材→案件マッチング**: 人材に最適な案件を自動推薦
+- **一括マッチング**: 複数の案件と人材を同時に分析
+- **マッチングスコア**: 詳細なスコアリングと理由の表示
 
-Changes made via Lovable will be committed automatically to this repo.
+### 4. メール連携
+- **テンプレート管理**: 再利用可能なメールテンプレート
+- **自動情報挿入**: 案件・人材情報の自動挿入
+- **履歴書添付**: 候補者の履歴書を自動添付
+- **送信履歴管理**: 送信状況の追跡と管理
 
-**Use your preferred IDE**
+### 5. 統計・分析
+- **ダッシュボード**: リアルタイムの統計情報表示
+- **マッチング分析**: 成功率や傾向の分析
+- **月次レポート**: 採用活動の効果測定
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 技術スタック
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### フロントエンド
+- **React 18** + **TypeScript**: 型安全なモダンなUI開発
+- **Vite**: 高速な開発環境とビルド
+- **shadcn/ui**: 美しく機能的なUIコンポーネント
+- **Tailwind CSS**: 効率的なスタイリング
+- **React Router v6**: SPAルーティング
+- **TanStack Query**: 効率的なデータフェッチングと状態管理
 
-Follow these steps:
+### バックエンド・インフラ
+- **Supabase**: 認証、データベース、リアルタイム機能
+- **PostgreSQL**: 高性能なリレーショナルデータベース
+- **pgvector**: ベクトル類似度検索によるAIマッチング
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+## セットアップ
+
+### 必要な環境
+- Node.js 18.0以上
+- npm または yarn
+
+### インストール手順
+
+```bash
+# リポジトリのクローン
 git clone <YOUR_GIT_URL>
+cd TechRecruiterAIForChinaBusinessFront
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 依存関係のインストール
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 環境変数の設定
+cp .env.example .env
+# .envファイルを編集してSupabaseの認証情報を設定
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 開発サーバーの起動
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### ビルド
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# プロダクションビルド
+npm run build
 
-**Use GitHub Codespaces**
+# 開発環境用ビルド
+npm run build:dev
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# ビルド結果のプレビュー
+npm run preview
+```
 
-## What technologies are used for this project?
+## プロジェクト構造
 
-This project is built with:
+```
+src/
+├── components/       # 再利用可能なUIコンポーネント
+│   ├── auth/        # 認証関連
+│   ├── cases/       # 案件管理
+│   ├── candidates/  # 人材管理
+│   ├── matching/    # マッチング機能
+│   └── layout/      # レイアウト
+├── pages/           # ページコンポーネント
+├── services/        # APIサービス層
+├── hooks/           # カスタムReactフック
+├── contexts/        # Reactコンテキスト
+├── lib/             # ユーティリティ関数
+└── integrations/    # 外部サービス統合
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 主要なAPIエンドポイント
 
-## How can I deploy this project?
+### AIマッチングAPI
+- `POST /api/v1/ai-matching/project-to-engineers` - 案件に最適な人材を検索
+- `POST /api/v1/ai-matching/engineer-to-projects` - 人材に最適な案件を検索
+- `POST /api/v1/ai-matching/bulk-matching` - 一括マッチング処理
+- `GET /api/v1/ai-matching/history/{tenant_id}` - マッチング履歴取得
 
-Simply open [Lovable](https://lovable.dev/projects/4931c54a-ae4d-44e6-b58d-d89f3e9ae05f) and click on Share -> Publish.
+## データベーススキーマ
 
-## Can I connect a custom domain to my Lovable project?
+主要なテーブル：
+- `projects` - 案件情報
+- `engineers` - エンジニア情報
+- `project_engineer_matches` - マッチング結果
+- `email_templates` - メールテンプレート
+- `ai_matching_history` - AIマッチング履歴
 
-Yes, you can!
+詳細なスキーマ定義は[CLAUDE.md](./CLAUDE.md)を参照してください。
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 開発ガイドライン
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### コード規約
+- TypeScriptの厳格な型付けを使用
+- React Hooksのベストプラクティスに従う
+- コンポーネントは機能ごとに分割
+- 日本語でのコメント・ドキュメント記述
+
+### コミット規約
+- 機能追加: `feat: 機能の説明`
+- バグ修正: `fix: バグの説明`
+- ドキュメント: `docs: ドキュメントの更新`
+- リファクタリング: `refactor: リファクタリング内容`
+
+## ライセンス
+
+このプロジェクトは商用プロジェクトです。無断での使用・複製・配布は禁止されています。
+
+## サポート
+
+技術的な質問や問題がある場合は、プロジェクト管理者にお問い合わせください。
+
+---
+
+© 2024 Tech Recruiter AI. All rights reserved.
