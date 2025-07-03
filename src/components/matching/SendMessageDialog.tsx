@@ -276,7 +276,7 @@ export const SendMessageDialog: React.FC<SendMessageDialogProps> = ({
         setSending(false);
         
         if (result.status === 'success') {
-          toast.success("送信完了", {
+          toast.success("メール送信完了", {
             description: `添付ファイル付きメールが正常に送信されました（キューID: ${result.queue_id}）`,
           });
           onClose();
