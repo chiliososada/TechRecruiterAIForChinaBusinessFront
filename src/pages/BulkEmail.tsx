@@ -166,7 +166,7 @@ const BulkEmail: React.FC = () => {
       console.error('Error loading contacts:', error);
       toast({
         title: "エラー",
-        description: "顧客データの読み込みに失敗しました。",
+        description: "会社データの読み込みに失敗しました。",
         variant: "destructive"
       });
     } finally {
@@ -341,7 +341,7 @@ const BulkEmail: React.FC = () => {
 
       toast({
         title: "成功",
-        description: editingContact ? "顧客情報を更新しました。" : "顧客を追加しました。",
+        description: editingContact ? "会社情報を更新しました。" : "会社を追加しました。",
       });
 
       setIsContactDialogOpen(false);
@@ -361,7 +361,7 @@ const BulkEmail: React.FC = () => {
       console.error('Error saving contact:', error);
       toast({
         title: "エラー",
-        description: "顧客の保存に失敗しました。",
+        description: "会社の保存に失敗しました。",
         variant: "destructive"
       });
     } finally {
@@ -371,7 +371,7 @@ const BulkEmail: React.FC = () => {
 
   // Handle contact deletion
   const handleDeleteContact = async (contactId: string) => {
-    if (!confirm('この顧客を削除しますか？')) return;
+    if (!confirm('この会社を削除しますか？')) return;
     
     try {
       setLoading(true);
@@ -391,7 +391,7 @@ const BulkEmail: React.FC = () => {
       
       toast({
         title: "成功",
-        description: "顧客を削除しました。",
+        description: "会社を削除しました。",
       });
       
       await loadContacts();
@@ -399,7 +399,7 @@ const BulkEmail: React.FC = () => {
       console.error('Error deleting contact:', error);
       toast({
         title: "エラー",
-        description: "顧客の削除に失敗しました。",
+        description: "会社の削除に失敗しました。",
         variant: "destructive"
       });
     } finally {
@@ -612,7 +612,7 @@ const BulkEmail: React.FC = () => {
 
     // Show confirmation dialog for bulk send
     const selectedContactsList = contacts.filter(c => selectedContacts.has(c.id));
-    const confirmMessage = `${selectedContactsList.length}名の顧客にメールを送信しますか？\n\n送信予定:\n${selectedContactsList.map(c => `• ${c.contact_name} (${c.company_name})`).slice(0, 5).join('\n')}${selectedContactsList.length > 5 ? `\n...他${selectedContactsList.length - 5}名` : ''}`;
+    const confirmMessage = `${selectedContactsList.length}名の会社にメールを送信しますか？\n\n送信予定:\n${selectedContactsList.map(c => `• ${c.contact_name} (${c.company_name})`).slice(0, 5).join('\n')}${selectedContactsList.length > 5 ? `\n...他${selectedContactsList.length - 5}名` : ''}`;
     
     if (!confirm(confirmMessage)) {
       return;
@@ -734,7 +734,7 @@ const BulkEmail: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-800 japanese-text">一括送信</h1>
           </div>
           <p className="text-gray-600 text-lg japanese-text">
-            顧客リストを管理し、効率的にメールを送信します。
+            会社リストを管理し、効率的にメールを送信します。
           </p>
         </div>
 
@@ -747,7 +747,7 @@ const BulkEmail: React.FC = () => {
                   <div className="bg-blue-500 p-1.5 rounded-md">
                     <Users className="h-4 w-4 text-white" />
                   </div>
-                  顧客選択エリア
+                  会社選択エリア
                 </CardTitle>
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
@@ -797,7 +797,7 @@ const BulkEmail: React.FC = () => {
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle className="japanese-text">
-                          {editingContact ? '顧客編集' : '顧客追加'}
+                          {editingContact ? '会社編集' : '会社追加'}
                         </DialogTitle>
                       </DialogHeader>
                       <form onSubmit={handleContactSubmit} className="space-y-4">
@@ -1156,7 +1156,7 @@ const BulkEmail: React.FC = () => {
                     <Label className="text-sm font-medium japanese-text">プレビュー</Label>
                     <div className="mt-2 p-4 border border-gray-200 rounded-lg bg-gradient-to-r from-amber-50/50 to-yellow-50/50">
                       <div className="text-xs text-muted-foreground mb-2">
-                        ※ 実際のメールでは変数が各顧客の情報に置き換えられます
+                        ※ 実際のメールでは変数が各会社の情報に置き換えられます
                       </div>
                       <div className="whitespace-pre-wrap text-sm">
                         {emailBody}
