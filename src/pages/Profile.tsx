@@ -7,6 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TenantSelector } from '@/components/auth/TenantSelector';
+import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
+import { getStoredTokens } from '@/utils/auth-api';
+import { Key, Loader2 } from 'lucide-react';
 
 interface ProfileData {
   first_name: string | null;
@@ -26,6 +30,14 @@ export default function Profile() {
     job_title: '',
     company: '',
   });
+  
+  // パスワード変更のstate
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -77,6 +89,97 @@ export default function Profile() {
       'test_user': 'テストユーザー'
     };
     return roleMap[role as keyof typeof roleMap] || '不明';
+  };
+
+  // パスワード変更処理
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // バリデーション
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードが一致しません。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードは6文字以上で入力してください。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードは現在のパスワードと異なる必要があります。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    
+    try {
+      const { accessToken } = getStoredTokens();
+      
+      if (!accessToken) {
+        toast({
+          title: "エラー",
+          description: "認証トークンが見つかりません。再度ログインしてください。",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/change-password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          current_password: passwordForm.currentPassword,
+          new_password: passwordForm.newPassword
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        toast({
+          title: "成功",
+          description: "パスワードが正常に変更されました。",
+        });
+        
+        // フォームをリセット
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      } else {
+        toast({
+          title: "エラー",
+          description: data.message || "パスワードの変更に失敗しました。",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('パスワード変更エラー:', error);
+      toast({
+        title: "エラー",
+        description: "パスワード変更中にエラーが発生しました。",
+        variant: "destructive"
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   if (loading) {
@@ -175,6 +278,77 @@ export default function Profile() {
               </CardContent>
             </Card>
           )}
+
+          {/* パスワード変更セクション */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 japanese-text">
+                <Key className="h-5 w-5" />
+                パスワード変更
+              </CardTitle>
+              <CardDescription className="japanese-text">
+                アカウントのパスワードを変更します
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div>
+                  <Label htmlFor="current-password" className="japanese-text">現在のパスワード</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="new-password" className="japanese-text">新しいパスワード</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
+                    placeholder="6文字以上"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="confirm-password" className="japanese-text">新しいパスワード（確認）</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  disabled={isChangingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                  className="w-full sm:w-auto"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      変更中...
+                    </>
+                  ) : (
+                    'パスワードを変更'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
         </div>
       </div>

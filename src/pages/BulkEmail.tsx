@@ -35,7 +35,9 @@ import {
   FileSpreadsheet,
   AlertCircle,
   CheckCircle,
-  FileDown
+  FileDown,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import {
   Dialog,
@@ -107,6 +109,12 @@ const BulkEmail: React.FC = () => {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [emailSignature, setEmailSignature] = useState('');
+  
+  // Collapse state for sections
+  const [isGroupSectionCollapsed, setIsGroupSectionCollapsed] = useState(false);
+  const [isCompanySectionCollapsed, setIsCompanySectionCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedCompanies, setCollapsedCompanies] = useState<Set<string>>(new Set());
 
   // Form data for new/edit contact
   const [formData, setFormData] = useState({
@@ -255,6 +263,28 @@ const BulkEmail: React.FC = () => {
     }
     
     setSelectedContacts(newSelected);
+  };
+  
+  // Toggle group collapse
+  const toggleGroupCollapse = (groupName: string) => {
+    const newCollapsed = new Set(collapsedGroups);
+    if (newCollapsed.has(groupName)) {
+      newCollapsed.delete(groupName);
+    } else {
+      newCollapsed.add(groupName);
+    }
+    setCollapsedGroups(newCollapsed);
+  };
+  
+  // Toggle company collapse
+  const toggleCompanyCollapse = (companyName: string) => {
+    const newCollapsed = new Set(collapsedCompanies);
+    if (newCollapsed.has(companyName)) {
+      newCollapsed.delete(companyName);
+    } else {
+      newCollapsed.add(companyName);
+    }
+    setCollapsedCompanies(newCollapsed);
   };
 
   // Handle contact form submission
@@ -914,30 +944,64 @@ const BulkEmail: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <ScrollArea className="h-[600px] rounded-lg border border-gray-100 bg-gray-50/30 p-2">
+                <ScrollArea className="h-[750px] rounded-lg border border-gray-100 bg-gray-50/30 p-2">
                   <div className="space-y-4">
                     {/* Group View */}
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-sm japanese-text text-gray-700 px-2">グループ別</h3>
-                      {Object.values(groupedByGroup).map((group) => (
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="font-semibold text-sm japanese-text text-gray-700">グループ別</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsGroupSectionCollapsed(!isGroupSectionCollapsed)}
+                          className="h-6 px-2"
+                        >
+                          {isGroupSectionCollapsed ? (
+                            <>
+                              <ChevronRight className="h-4 w-4 mr-1" />
+                              展開
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              折りたたむ
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {!isGroupSectionCollapsed && Object.values(groupedByGroup).map((group) => (
                         <div key={group.group_name} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-white shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              checked={group.selected}
-                              onCheckedChange={() => toggleGroupSelection(group.group_name)}
-                            />
-                            <Badge 
-                              variant="secondary" 
-                              className="text-white text-xs"
-                              style={{ backgroundColor: group.group_color }}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={group.selected}
+                                onCheckedChange={() => toggleGroupSelection(group.group_name)}
+                              />
+                              <Badge 
+                                variant="secondary" 
+                                className="text-white text-xs"
+                                style={{ backgroundColor: group.group_color }}
+                              >
+                                {group.group_name}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                ({group.contacts.length})
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleGroupCollapse(group.group_name)}
+                              className="h-6 w-6 p-0"
                             >
-                              {group.group_name}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              ({group.contacts.length})
-                            </span>
+                              {collapsedGroups.has(group.group_name) ? (
+                                <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
-                          {group.contacts.map((contact) => (
+                          {!collapsedGroups.has(group.group_name) && group.contacts.map((contact) => (
                             <div key={contact.id} className="flex items-center gap-2 pl-6">
                               <Checkbox
                                 checked={selectedContacts.has(contact.id)}
@@ -987,21 +1051,55 @@ const BulkEmail: React.FC = () => {
 
                     {/* Company View */}
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-sm japanese-text text-gray-700 px-2">会社別</h3>
-                      {Object.values(groupedByCompany).map((company) => (
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="font-semibold text-sm japanese-text text-gray-700">会社別</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsCompanySectionCollapsed(!isCompanySectionCollapsed)}
+                          className="h-6 px-2"
+                        >
+                          {isCompanySectionCollapsed ? (
+                            <>
+                              <ChevronRight className="h-4 w-4 mr-1" />
+                              展開
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              折りたたむ
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {!isCompanySectionCollapsed && Object.values(groupedByCompany).map((company) => (
                         <div key={company.company_name} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-white shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              checked={company.selected}
-                              onCheckedChange={() => toggleCompanySelection(company.company_name)}
-                            />
-                            <Building className="h-4 w-4" />
-                            <span className="font-medium text-sm">{company.company_name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              ({company.contacts.length})
-                            </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={company.selected}
+                                onCheckedChange={() => toggleCompanySelection(company.company_name)}
+                              />
+                              <Building className="h-4 w-4" />
+                              <span className="font-medium text-sm">{company.company_name}</span>
+                              <span className="text-sm text-muted-foreground">
+                                ({company.contacts.length})
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleCompanyCollapse(company.company_name)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {collapsedCompanies.has(company.company_name) ? (
+                                <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
-                          {company.contacts.map((contact) => (
+                          {!collapsedCompanies.has(company.company_name) && company.contacts.map((contact) => (
                             <div key={contact.id} className="flex items-center gap-2 pl-6">
                               <Checkbox
                                 checked={selectedContacts.has(contact.id)}
