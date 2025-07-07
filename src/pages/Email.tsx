@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Shield, Mail, History, Wifi, Save, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { saveSMTPSettings, getSMTPSettings, testSMTPConnection } from '@/utils/backend-api';
+import { saveSMTPSettings, getSMTPSettings, testSMTPConnection, getDefaultSMTPSettingId } from '@/utils/backend-api';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function Email() {
@@ -160,8 +160,8 @@ export function Email() {
       return;
     }
 
-    // Get the saved SMTP setting ID or check if we have an existing setting
-    const smtpSettingId = localStorage.getItem('default_smtp_setting_id');
+    // Get the SMTP setting ID from database for current tenant
+    const smtpSettingId = await getDefaultSMTPSettingId(user);
     
     if (!smtpSettingId) {
       toast({

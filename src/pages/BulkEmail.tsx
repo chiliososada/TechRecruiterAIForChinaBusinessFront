@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { businessClient } from '@/integrations/supabase/client';
-import { sendIndividualEmail } from '@/utils/backend-api';
+import { sendIndividualEmail, getDefaultSMTPSettingId } from '@/utils/backend-api';
 import { 
   downloadCSVTemplate, 
   downloadEmptyCSVTemplate, 
@@ -115,6 +115,13 @@ const BulkEmail: React.FC = () => {
   const [isCompanySectionCollapsed, setIsCompanySectionCollapsed] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedCompanies, setCollapsedCompanies] = useState<Set<string>>(new Set());
+  
+  // Bulk send confirmation dialog state
+  const [isBulkSendDialogOpen, setIsBulkSendDialogOpen] = useState(false);
+  const [bulkSendData, setBulkSendData] = useState<{
+    selectedContacts: GroupedContact[];
+    confirmMessage: string;
+  } | null>(null);
 
   // Form data for new/edit contact
   const [formData, setFormData] = useState({
@@ -621,7 +628,7 @@ const BulkEmail: React.FC = () => {
     }
 
     // Check if SMTP settings are configured
-    const smtpSettingId = localStorage.getItem('default_smtp_setting_id');
+    const smtpSettingId = await getDefaultSMTPSettingId({ tenant_id: currentTenant?.id || '' });
     if (!smtpSettingId) {
       toast({
         title: "エラー",
@@ -642,11 +649,22 @@ const BulkEmail: React.FC = () => {
 
     // Show confirmation dialog for bulk send
     const selectedContactsList = contacts.filter(c => selectedContacts.has(c.id));
-    const confirmMessage = `${selectedContactsList.length}名の会社にメールを送信しますか？\n\n送信予定:\n${selectedContactsList.map(c => `• ${c.contact_name} (${c.company_name})`).slice(0, 5).join('\n')}${selectedContactsList.length > 5 ? `\n...他${selectedContactsList.length - 5}名` : ''}`;
+    const confirmMessage = `${selectedContactsList.length}名の会社にメールを送信しますか？`;
     
-    if (!confirm(confirmMessage)) {
+    setBulkSendData({
+      selectedContacts: selectedContactsList,
+      confirmMessage
+    });
+    setIsBulkSendDialogOpen(true);
+  };
+
+  // Handle confirmed bulk send
+  const handleConfirmedBulkSend = async () => {
+    if (!bulkSendData || !currentTenant?.id) {
       return;
     }
+
+    setIsBulkSendDialogOpen(false);
 
     try {
       setLoading(true);
@@ -654,11 +672,11 @@ const BulkEmail: React.FC = () => {
       // Add progress feedback
       toast({
         title: "送信中",
-        description: `${selectedContactsList.length}件のメールを送信しています...`,
+        description: `${bulkSendData.selectedContacts.length}件のメールを送信しています...`,
       });
       
       // Prepare email data for each contact with variable replacement
-      const emailPromises = selectedContactsList.map(async (contact) => {
+      const emailPromises = bulkSendData.selectedContacts.map(async (contact) => {
         const personalizedSubject = replaceVariables(emailSubject, contact);
         const personalizedBody = replaceVariables(emailBody, contact);
         const personalizedSignature = replaceVariables(emailSignature, contact);
@@ -701,7 +719,7 @@ const BulkEmail: React.FC = () => {
           successCount++;
         } else {
           failedCount++;
-          failedContacts.push(selectedContactsList[index].contact_name);
+          failedContacts.push(bulkSendData.selectedContacts[index].contact_name);
         }
       });
       
@@ -1472,6 +1490,111 @@ const BulkEmail: React.FC = () => {
                   )}
                 </Button>
               )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Send Confirmation Dialog */}
+      <Dialog open={isBulkSendDialogOpen} onOpenChange={setIsBulkSendDialogOpen}>
+        <DialogContent className="sm:max-w-2xl bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 japanese-text text-lg">
+              <div className="bg-orange-500 p-2 rounded-lg">
+                <Send className="h-5 w-5 text-white" />
+              </div>
+              メール送信確認
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Confirmation Message */}
+            <div className="text-center py-4">
+              <div className="text-lg font-medium text-gray-800 mb-2">
+                {bulkSendData?.confirmMessage}
+              </div>
+              <div className="text-sm text-gray-600">
+                以下の宛先にメールを送信します。
+              </div>
+            </div>
+
+            {/* Recipients List */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-blue-50/30 to-indigo-50/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-sm">送信先リスト</span>
+              </div>
+              <ScrollArea className="h-40">
+                <div className="space-y-2">
+                  {bulkSendData?.selectedContacts.map((contact, index) => (
+                    <div key={contact.id} className="flex items-center gap-2 text-sm py-1">
+                      <span className="text-gray-500 w-6 text-right">{index + 1}.</span>
+                      <Badge 
+                        variant="secondary" 
+                        className="text-white text-xs"
+                        style={{ backgroundColor: contact.group_color }}
+                      >
+                        {contact.group_name}
+                      </Badge>
+                      <span className="font-medium">{contact.contact_name}</span>
+                      <span className="text-gray-500">({contact.company_name})</span>
+                      <span className="text-gray-400 text-xs">{contact.contact_email}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Email Preview */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-amber-50/30 to-yellow-50/30">
+              <div className="flex items-center gap-2 mb-3">
+                <FileSpreadsheet className="h-4 w-4 text-amber-600" />
+                <span className="font-medium text-sm">メール内容</span>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm">
+                  <span className="font-medium">件名：</span>
+                  <span className="text-gray-700">{emailSubject}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">本文：</span>
+                  <div className="text-gray-700 text-xs mt-1 p-2 bg-white/50 rounded border max-h-20 overflow-y-auto">
+                    {emailBody.substring(0, 100)}
+                    {emailBody.length > 100 && '...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Warning Message */}
+            <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-orange-700">
+                <div className="font-medium mb-1">注意事項</div>
+                <div>
+                  • 送信後はメールの取り消しはできません<br />
+                  • 変数（{`{{company_name}}`}等）は各宛先の情報に自動で置き換わります<br />
+                  • 送信完了まで画面を閉じないでください
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsBulkSendDialogOpen(false)}
+                className="min-w-24"
+              >
+                キャンセル
+              </Button>
+              <Button 
+                onClick={handleConfirmedBulkSend}
+                className="min-w-24 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                送信実行
+              </Button>
             </div>
           </div>
         </DialogContent>
