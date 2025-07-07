@@ -397,7 +397,7 @@ ${!emailTemplate.includes('よろしくお願い申し上げます') ?
     ).size;
 
     // メール送信処理（実際のアプリケーションではAPIコールなど）
-    toast.success(`${selectedRepresentatives.length}名の担当者（${selectedCompaniesCount}社）に案件情報のメールを送信しました`, {
+    toast.success(`${selectedRepresentatives.length}名の担当者（${selectedCompaniesCount}社）に案件情報のメールを送信いたしました`, {
       description: `案件「${selectedCase.title}」の情報が送信されました`
     });
 

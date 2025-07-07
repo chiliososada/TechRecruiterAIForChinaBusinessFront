@@ -12,7 +12,8 @@ export const DebugPanel: React.FC = () => {
     const { user, currentTenant } = useAuth();
 
     // 開発環境以外では何も表示しない
-    if (!import.meta.env.DEV) {
+    // NODE_ENV が production の場合、または Vite の production モードの場合は非表示
+    if (import.meta.env.VITE_NODE_ENV === 'production' || import.meta.env.MODE === 'production' || !import.meta.env.DEV) {
         return null;
     }
 

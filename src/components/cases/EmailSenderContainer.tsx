@@ -378,7 +378,7 @@ export function EmailSenderContainer({ mailCases }: EmailSenderContainerProps) {
         }, user);
 
         if (result.success) {
-          toast.success(`${toEmails.length}名にメールを送信しました（キューID: ${result.data?.queue_id}）`);
+          toast.success(`${toEmails.length}名にメールを送信いたしました（キューID: ${result.data?.queue_id}）`);
         } else {
           toast.error(result.message || 'メール送信に失敗しました');
         }

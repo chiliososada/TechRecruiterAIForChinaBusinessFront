@@ -91,7 +91,7 @@ export const CaseListTable: React.FC<CaseListTableProps> = ({
             <TableHead className="japanese-text font-medium">予算</TableHead>
             <TableHead className="japanese-text font-medium">外国人</TableHead>
             <TableHead className="japanese-text font-medium">ステータス</TableHead>
-            <TableHead className="japanese-text font-medium">希望単価</TableHead>
+            <TableHead className="japanese-text font-medium">希望単価（万円）</TableHead>
             <TableHead className="japanese-text font-medium">個人事業者</TableHead>
             {isOtherCompany && (
               <TableHead className="japanese-text font-medium">元データ</TableHead>

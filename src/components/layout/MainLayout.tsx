@@ -25,7 +25,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         isCollapsed ? "ml-16" : "ml-64"
       )}>
         <main className="h-screen overflow-y-auto">
-          <div className="p-6">
+          <div className="px-3 py-4">
             {children}
           </div>
         </main>

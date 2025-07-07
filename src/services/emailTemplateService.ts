@@ -285,10 +285,27 @@ class EmailTemplateService {
   async incrementUsageCount(templateId: string, tenantId: string): Promise<boolean> {
     try {
       const client = businessClientManager.getClient();
+      
+      // 現在の使用回数を取得
+      const { data: currentTemplate, error: fetchError } = await client
+        .from('email_templates')
+        .select('usage_count')
+        .eq('id', templateId)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (fetchError) {
+        console.error('テンプレート取得失敗:', fetchError);
+        throw new Error(`テンプレート取得失敗: ${fetchError.message}`);
+      }
+
+      const currentUsageCount = currentTemplate?.usage_count || 0;
+
+      // 使用回数を増加して更新
       const { error } = await client
         .from('email_templates')
         .update({
-        
+          usage_count: currentUsageCount + 1,
           last_used_at: new Date().toISOString(),
         })
         .eq('id', templateId)

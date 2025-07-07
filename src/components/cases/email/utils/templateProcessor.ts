@@ -1,15 +1,24 @@
 import { Engineer } from '@/components/candidates/types';
 import { EmailTemplate } from '../hooks/useEmailTemplates';
+import { ProjectRow } from '@/integrations/supabase/business-types';
 
 /**
- * Apply template placeholders for single or multiple engineers
+ * Apply template placeholders with engineers and projects
  */
-export const applyTemplateWithEngineers = (
+export const applyTemplateWithData = (
   template: EmailTemplate,
-  engineers: Engineer[],
-  additionalData?: Record<string, string>
+  data: {
+    engineers?: Engineer[];
+    projects?: ProjectRow[];
+    additionalData?: Record<string, string>;
+  }
 ): { subject: string; body: string; signature: string } => {
+  const engineers = data.engineers || [];
+  const projects = data.projects || [];
+  const additionalData = data.additionalData || {};
+  
   const engineerCount = engineers.length;
+  const project = projects.length > 0 ? projects[0] : null;
   
   // Prepare basic placeholder data
   const placeholderData: Record<string, string> = {
@@ -22,6 +31,20 @@ export const applyTemplateWithEngineers = (
     
     // Experience range
     experience_range: extractExperienceRange(engineers),
+    
+    // Project data placeholders
+    project_title: project?.title || '',
+    project_description: project?.description || project?.detail_description || '',
+    project_skills: formatProjectSkills(project?.skills),
+    project_location: project?.location || '',
+    project_budget: project?.budget || project?.desired_budget || '',
+    project_duration: project?.duration || '',
+    project_start_date: formatDate(project?.start_date),
+    project_japanese_level: project?.japanese_level || '',
+    project_experience: project?.experience || '',
+    project_key_technologies: project?.key_technologies || '',
+    project_work_type: project?.work_type || '',
+    project_max_candidates: project?.max_candidates?.toString() || '',
     
     // Apply additional data if provided
     ...additionalData,
@@ -61,6 +84,41 @@ export const applyTemplateWithEngineers = (
     : '';
 
   return { subject, body, signature };
+};
+
+/**
+ * Apply template placeholders for single or multiple engineers (legacy function)
+ */
+export const applyTemplateWithEngineers = (
+  template: EmailTemplate,
+  engineers: Engineer[],
+  additionalData?: Record<string, string>
+): { subject: string; body: string; signature: string } => {
+  return applyTemplateWithData(template, { engineers, additionalData });
+};
+
+/**
+ * Format project skills for display
+ */
+const formatProjectSkills = (skills: string[] | undefined): string => {
+  if (Array.isArray(skills)) {
+    return skills.join(', ');
+  }
+  return '';
+};
+
+/**
+ * Format date for display
+ */
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('ja-JP');
+  } catch {
+    return '';
+  }
 };
 
 /**
@@ -121,11 +179,14 @@ const generateDetailedEngineerList = (engineers: Engineer[]): string => {
     return `【技術者${index + 1}】
 【技術者名】${engineer.name}
 【スキル】${formatSkills(engineer.skills)}
-【経験年数】${engineer.experience || ''}
-【日本語レベル】${engineer.japaneseLevel || ''}
-【最寄り駅】${engineer.nearestStation || ''}
+【経験年数】${engineer.experience || '未設定'}
+【日本語レベル】${engineer.japaneseLevel || '未設定'}
+【最寄り駅】${engineer.nearestStation || '未設定'}
 【希望単価】${formatDesiredRate(engineer)}
-【稼働可能日】${engineer.availability || ''}`;
+【稼働可能日】${engineer.availability || '未設定'}
+【国籍】${engineer.nationality || '未設定'}
+【学歴】${engineer.education || '未設定'}
+【資格】${formatCertifications(engineer.certifications)}`;
   }).join('\n\n');
 };
 
@@ -133,14 +194,16 @@ const generateDetailedEngineerList = (engineers: Engineer[]): string => {
  * Generate engineer table (tab-separated for email)
  */
 const generateEngineerTable = (engineers: Engineer[]): string => {
-  const header = '技術者名\tスキル\t経験年数\t日本語レベル\t希望単価';
+  const header = '技術者名\tスキル\t経験年数\t日本語レベル\t希望単価\t最寄り駅\t国籍';
   const rows = engineers.map(engineer => {
     return [
       engineer.name,
       formatSkills(engineer.skills),
-      engineer.experience || '',
-      engineer.japaneseLevel || '',
-      formatDesiredRate(engineer)
+      engineer.experience || '未設定',
+      engineer.japaneseLevel || '未設定',
+      formatDesiredRate(engineer),
+      engineer.nearestStation || '未設定',
+      engineer.nationality || '未設定'
     ].join('\t');
   });
   
@@ -154,9 +217,9 @@ const generateSummaryEngineerList = (engineers: Engineer[]): string => {
   return engineers.map(engineer => {
     return `・${engineer.name}
   スキル：${formatSkills(engineer.skills)}
-  経験：${engineer.experience || ''}、日本語：${engineer.japaneseLevel || ''}
-  最寄り駅：${engineer.nearestStation || ''}、希望単価：${formatDesiredRate(engineer)}
-  稼働可能日：${engineer.availability || ''}`;
+  経験：${engineer.experience || '未設定'}、日本語：${engineer.japaneseLevel || '未設定'}
+  最寄り駅：${engineer.nearestStation || '未設定'}、希望単価：${formatDesiredRate(engineer)}
+  稼働可能日：${engineer.availability || '未設定'}、国籍：${engineer.nationality || '未設定'}`;
   }).join('\n\n');
 };
 
@@ -219,17 +282,50 @@ const formatSkills = (skills: string[] | undefined): string => {
  * Format desired rate for display
  */
 const formatDesiredRate = (engineer: Engineer): string => {
-  // This would need to be implemented based on your engineer data structure
-  // For now, return empty string as this field might not be available
-  return '';
+  // UI型のengineerの場合（candidates/types.tsのEngineer型）
+  if (engineer.desiredRate) {
+    // 既に数字と単位が含まれている場合はそのまま返す
+    if (engineer.desiredRate.includes('円')) {
+      return engineer.desiredRate;
+    }
+    // 数字のみの場合は単位を追加
+    const rate = parseInt(engineer.desiredRate.replace(/[^\d]/g, ''));
+    return rate > 0 ? `${rate.toLocaleString()}円/月` : '';
+  }
+  
+  // DB型のengineerの場合（最小値・最大値対応）
+  const minRate = (engineer as any).desired_rate_min;
+  const maxRate = (engineer as any).desired_rate_max;
+  const singleRate = (engineer as any).desired_rate;
+  
+  // 最小値と最大値の両方がある場合
+  if (minRate && maxRate && minRate !== maxRate) {
+    return `${minRate.toLocaleString()}〜${maxRate.toLocaleString()}円/月`;
+  }
+  // 最小値のみまたは最小値と最大値が同じ場合
+  else if (minRate) {
+    return `${minRate.toLocaleString()}円/月`;
+  }
+  // 最大値のみの場合
+  else if (maxRate) {
+    return `${maxRate.toLocaleString()}円/月`;
+  }
+  // 単一値の場合
+  else if (singleRate) {
+    return `${singleRate.toLocaleString()}円/月`;
+  }
+  
+  return '未設定';
 };
 
 /**
  * Format certifications for display
  */
-const formatCertifications = (certifications: string[] | undefined): string => {
-  if (Array.isArray(certifications)) {
-    return certifications.join(', ');
+const formatCertifications = (certifications: string[] | undefined | null): string => {
+  if (Array.isArray(certifications) && certifications.length > 0) {
+    // 空文字列や null 値を除外
+    const validCertifications = certifications.filter(cert => cert && cert.trim() !== '');
+    return validCertifications.length > 0 ? validCertifications.join('、') : '未設定';
   }
-  return '';
+  return '未設定';
 };

@@ -208,7 +208,7 @@ export function Cases({ companyType = 'own' }: CasesProps) {
     handleEditChange,
     handleSaveEdit,
     localCaseData // 获取本地数据状态
-  } = useCaseSelection(normalizedCaseData);
+  } = useCaseSelection(normalizedCaseData, effectiveCompanyType);
   
   // Get company list
   const companyList = getCompanyList();
@@ -386,7 +386,7 @@ export function Cases({ companyType = 'own' }: CasesProps) {
       <div className="flex-1 space-y-8">
         <CasesHeader pageTitle={pageTitle} />
 
-        <TabsWithContext defaultValue="list" contextId={effectiveCompanyType} className="space-y-6">
+        <TabsWithContext key={effectiveCompanyType} defaultValue="list" contextId={effectiveCompanyType} className="space-y-6">
           {/* For own company, show all tabs including the new archive tab */}
           {effectiveCompanyType === 'own' ? (
             <TabsList>

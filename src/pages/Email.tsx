@@ -548,44 +548,7 @@ export function Email() {
                     </p>
                   </div>
                   
-                  {/* Reply-to Email */}
-                  <div className="space-y-2 mt-3">
-                    <Label htmlFor="reply-to-email" className="japanese-text">返信先メール</Label>
-                    <Input 
-                      type="email" 
-                      id="reply-to-email" 
-                      placeholder="ryushigen@toyousoft.co.jp" 
-                      value={smtpSettings.replyToEmail}
-                      onChange={(e) => setSmtpSettings({...smtpSettings, replyToEmail: e.target.value})}
-                    />
-                    <p className="text-xs text-muted-foreground japanese-text">
-                      返信時の宛先（省略可）
-                    </p>
-                  </div>
                   
-                  {/* Send Limits */}
-                  <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="daily-limit" className="japanese-text">1日の送信上限</Label>
-                      <Input 
-                        type="number" 
-                        id="daily-limit" 
-                        placeholder="100" 
-                        value={smtpSettings.dailySendLimit}
-                        onChange={(e) => setSmtpSettings({...smtpSettings, dailySendLimit: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="hourly-limit" className="japanese-text">1時間の送信上限</Label>
-                      <Input 
-                        type="number" 
-                        id="hourly-limit" 
-                        placeholder="20" 
-                        value={smtpSettings.hourlySendLimit}
-                        onChange={(e) => setSmtpSettings({...smtpSettings, hourlySendLimit: e.target.value})}
-                      />
-                    </div>
-                  </div>
                 </div>
                 
                 <div className="pt-4">

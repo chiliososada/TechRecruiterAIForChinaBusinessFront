@@ -15,6 +15,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import EmailAnalysis from "./pages/EmailAnalysis";
 import BatchMatching from "./pages/BatchMatching";
+import BulkEmail from "./pages/BulkEmail";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ToastProvider } from "@/hooks/toast/toast-provider";
@@ -105,8 +106,22 @@ const App = () => {
                     <Route path="/auth" element={<Auth />} />
 
                     {/* Protected routes */}
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/test" element={<TestPage />} />
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/test"
+                      element={
+                        <ProtectedRoute>
+                          <TestPage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route
                       path="/protected"
                       element={
@@ -192,6 +207,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <Email />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/bulk-email"
+                      element={
+                        <ProtectedRoute>
+                          <BulkEmail />
                         </ProtectedRoute>
                       }
                     />

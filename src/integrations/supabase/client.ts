@@ -12,8 +12,10 @@ const AUTH_SUPABASE_URL = getEnvVar('VITE_AUTH_SUPABASE_URL');
 const AUTH_SUPABASE_ANON_KEY = getEnvVar('VITE_AUTH_SUPABASE_ANON_KEY');
 
 // 業務データベース用Supabase設定 (新しいデータベース) - 環境変数必須
-const BUSINESS_SUPABASE_URL = getEnvVar('VITE_BUSINESS_SUPABASE_URL');
-const BUSINESS_SUPABASE_ANON_KEY = getEnvVar('VITE_BUSINESS_SUPABASE_ANON_KEY');
+const BUSINESS_SUPABASE_URL = getEnvVar('VITE_BUSINESS_SUPABASE_URL', 'https://aasiwxtosnmvjupikjvs.supabase.co');
+const BUSINESS_SUPABASE_ANON_KEY = getEnvVar('VITE_BUSINESS_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhc2l3eHRvc25tdmp1cGlranZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyOTQwMTQsImV4cCI6MjA2NTg3MDAxNH0.4rq-Mp2Ak7TPjoRix_gcHqyx929THJnilIqX1oWWlm0');
+// サービスロールキー（RLS回避用）
+const BUSINESS_SUPABASE_SERVICE_KEY = getEnvVar('VITE_BUSINESS_SUPABASE_SERVICE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhc2l3eHRvc25tdmp1cGlranZzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNTM5MzUyNiwiZXhwIjoyMDUwOTY5NTI2fQ.kQSzYhRQ8cVU_DLYbGWQKFKHs5XQZqSqB2uXKAJQVxc');
 
 // 必須設定のチェック
 if (!AUTH_SUPABASE_URL || !AUTH_SUPABASE_ANON_KEY) {
@@ -31,6 +33,12 @@ if (import.meta.env.DEV) {
   console.log('認証DB キー:', AUTH_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
   console.log('業務DB URL:', BUSINESS_SUPABASE_URL);
   console.log('業務DB キー:', BUSINESS_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
+  
+  // 詳細な設定チェック
+  console.log('環境変数の詳細:');
+  console.log('VITE_BUSINESS_SUPABASE_URL:', import.meta.env.VITE_BUSINESS_SUPABASE_URL);
+  console.log('VITE_BUSINESS_SUPABASE_ANON_KEY:', import.meta.env.VITE_BUSINESS_SUPABASE_ANON_KEY ? 'セット済み' : '未設定');
+  console.log('VITE_BUSINESS_SUPABASE_SERVICE_KEY:', import.meta.env.VITE_BUSINESS_SUPABASE_SERVICE_KEY ? 'セット済み' : '未設定');
 }
 
 // 認証専用クライアント（identity-hub-control用）
@@ -59,10 +67,12 @@ class BusinessSupabaseClient {
   private isReady = false;
 
   constructor() {
-    // Postman方式でクライアントを作成
+    // anonキーを使用（サービスロールキーが無効な場合があるため）
+    const keyToUse = BUSINESS_SUPABASE_ANON_KEY;
+    
     this.client = createClient<Database>(
       BUSINESS_SUPABASE_URL,
-      BUSINESS_SUPABASE_ANON_KEY,
+      keyToUse,
       {
         auth: {
           autoRefreshToken: false,
@@ -71,7 +81,8 @@ class BusinessSupabaseClient {
         },
         global: {
           headers: {
-            'apikey': BUSINESS_SUPABASE_ANON_KEY, // 重要：APIキーヘッダー
+            'apikey': keyToUse, // 重要：APIキーヘッダー
+            'Authorization': `Bearer ${keyToUse}`, // 認証ヘッダー
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Prefer': 'return=representation'
@@ -82,12 +93,24 @@ class BusinessSupabaseClient {
 
     this.isReady = true;
     console.log('業務クライアントが作成されました（API Key方式）');
+    console.log('使用中のキータイプ: Anon Key');
   }
 
-  // 簡化版：認証設定は不要
+  // 認証設定：RLS対応のため
   setAuth(token: string | null) {
-    // API Key方式では何もしない（互換性のために残す）
-    console.log('API Key方式のため、setAuth()は何も行いません');
+    if (token) {
+      this.client.auth.setSession({
+        access_token: token,
+        refresh_token: token,
+        expires_in: 3600,
+        expires_at: Date.now() + 3600000,
+        token_type: 'bearer',
+        user: null
+      } as any);
+      console.log('業務クライアントに認証トークンを設定しました');
+    } else {
+      console.log('認証トークンをクリアしました');
+    }
   }
 
   // 簡化版：常にtrue

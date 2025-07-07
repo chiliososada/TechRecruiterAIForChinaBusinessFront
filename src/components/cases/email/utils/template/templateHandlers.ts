@@ -43,6 +43,7 @@ export const applyTemplate = (templateId: string, data: {
   
   // Create placeholder data with safe defaults
   const placeholderData = {
+    // Legacy placeholders for backward compatibility
     title: firstCase?.title || '',
     sender: firstCase?.sender || firstCase?.selectedSenderName || '',
     description: firstCase?.description || firstCase?.detailDescription || '',
@@ -50,7 +51,34 @@ export const applyTemplate = (templateId: string, data: {
     companyContact: 'AI採用担当',
     engineerName: firstEngineer?.name || '',
     engineerYears: firstEngineer?.experience || '',
-    engineerSkills: firstEngineer?.skills ? (Array.isArray(firstEngineer.skills) ? firstEngineer.skills.join('、') : firstEngineer.skills) : ''
+    engineerSkills: firstEngineer?.skills ? (Array.isArray(firstEngineer.skills) ? firstEngineer.skills.join('、') : firstEngineer.skills) : '',
+    
+    // New standardized placeholders
+    project_title: firstCase?.title || '',
+    project_description: firstCase?.description || firstCase?.detailDescription || '',
+    project_skills: firstCase?.skills ? (Array.isArray(firstCase.skills) ? firstCase.skills.join('、') : firstCase.skills) : '',
+    project_location: firstCase?.location || '',
+    project_budget: firstCase?.budget || '',
+    project_duration: firstCase?.duration || '',
+    project_start_date: firstCase?.startDate || '',
+    project_japanese_level: firstCase?.japaneseLevel || '',
+    project_experience: firstCase?.experience || '',
+    project_key_technologies: firstCase?.keyTechnologies || '',
+    project_work_type: firstCase?.workType || '',
+    project_max_candidates: firstCase?.maxCandidates?.toString() || '',
+    
+    engineer_name: firstEngineer?.name || '',
+    engineer_email: firstEngineer?.email || '',
+    engineer_skills: firstEngineer?.skills ? (Array.isArray(firstEngineer.skills) ? firstEngineer.skills.join('、') : firstEngineer.skills) : '',
+    engineer_experience: firstEngineer?.experience || '',
+    engineer_japanese_level: firstEngineer?.japaneseLevel || '',
+    engineer_nearest_station: firstEngineer?.nearestStation || '',
+    engineer_desired_rate: firstEngineer?.desiredRate || '',
+    engineer_availability: firstEngineer?.availability || '',
+    engineer_nationality: firstEngineer?.nationality || '',
+    engineer_education: firstEngineer?.education || '',
+    engineer_certifications: firstEngineer?.certifications ? (Array.isArray(firstEngineer.certifications) ? firstEngineer.certifications.join('、') : firstEngineer.certifications) : '',
+    engineer_self_promotion: firstEngineer?.selfPromotion || ''
   };
   
   // Replace placeholders
@@ -82,13 +110,11 @@ export const handleTemplateChange = (
 export const createTemplateHandlers = ({
   setSelectedTemplate,
   setSubject,
-  setEmailBody,
-  selectedEngineers
+  setEmailBody
 }: {
   setSelectedTemplate: (template: string) => void;
   setSubject: (subject: string) => void;
   setEmailBody: (body: string) => void;
-  selectedEngineers: Engineer[];
 }) => {
   return {
     handleTemplateChange: (templateId: string) => 

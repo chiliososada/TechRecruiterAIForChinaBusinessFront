@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { authClient } from '@/integrations/supabase/client'; // 使用认证客户端
-import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TenantSelector } from '@/components/auth/TenantSelector';
-import { InviteUserDialog } from '@/components/auth/InviteUserDialog';
+import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
+import { getStoredTokens } from '@/utils/auth-api';
+import { Key, Loader2 } from 'lucide-react';
 
 interface ProfileData {
   first_name: string | null;
@@ -22,9 +22,7 @@ interface ProfileData {
 
 export default function Profile() {
   const { user, profile, currentTenant, signOut } = useAuth();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>({
     first_name: '',
     last_name: '',
@@ -32,6 +30,14 @@ export default function Profile() {
     job_title: '',
     company: '',
   });
+  
+  // パスワード変更のstate
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -55,103 +61,6 @@ export default function Profile() {
       setLoading(false);
     }
   }, [profile, user]);
-
-  async function updateProfile() {
-    try {
-      setUpdating(true);
-
-      if (!user) {
-        toast({
-          title: "エラー",
-          description: "ユーザーが認証されていません",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('プロファイルを更新中:', user.id);
-
-      // First check if profile exists using authClient
-      const { data: existingProfile, error: checkError } = await authClient
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('プロファイル確認エラー:', checkError);
-        toast({
-          title: "更新失敗",
-          description: `プロファイル確認エラー: ${checkError.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const updateData = {
-        first_name: profileData.first_name || null,
-        last_name: profileData.last_name || null,
-        avatar_url: profileData.avatar_url || null,
-        job_title: profileData.job_title || null,
-        company: profileData.company || null,
-        tenant_id: currentTenant?.id || null, // 确保设置正确的tenant_id
-        updated_at: new Date().toISOString()
-      };
-
-      let result;
-      if (existingProfile) {
-        console.log('既存のプロファイルを更新中');
-        // Profile exists, use UPDATE
-        result = await authClient
-          .from('profiles')
-          .update(updateData)
-          .eq('id', user.id);
-      } else {
-        console.log('新しいプロファイルを作成中');
-        // Profile doesn't exist, use INSERT
-        result = await authClient
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email, // 确保email也被设置
-            role: user.role || 'member', // 确保role也被设置
-            ...updateData,
-            created_at: new Date().toISOString()
-          });
-      }
-
-      if (result.error) {
-        console.error('プロファイル更新エラー:', result.error);
-        toast({
-          title: "更新失敗",
-          description: `プロファイル更新エラー: ${result.error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('プロファイル更新成功');
-      toast({
-        title: "更新成功",
-        description: "プロファイルが正常に更新されました",
-      });
-
-      // 刷新页面以获取最新数据
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-
-    } catch (error: any) {
-      console.error('予期しないプロファイル更新エラー:', error);
-      toast({
-        title: "更新失敗",
-        description: `予期しないエラー: ${error.message || "プロファイルの更新中にエラーが発生しました"}`,
-        variant: "destructive",
-      });
-    } finally {
-      setUpdating(false);
-    }
-  }
 
   const getInitials = () => {
     return `${profileData.first_name?.charAt(0) || ''}${profileData.last_name?.charAt(0) || ''}`;
@@ -180,6 +89,97 @@ export default function Profile() {
       'test_user': 'テストユーザー'
     };
     return roleMap[role as keyof typeof roleMap] || '不明';
+  };
+
+  // パスワード変更処理
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // バリデーション
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードが一致しません。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードは6文字以上で入力してください。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      toast({
+        title: "エラー",
+        description: "新しいパスワードは現在のパスワードと異なる必要があります。",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    
+    try {
+      const { accessToken } = getStoredTokens();
+      
+      if (!accessToken) {
+        toast({
+          title: "エラー",
+          description: "認証トークンが見つかりません。再度ログインしてください。",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/change-password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          current_password: passwordForm.currentPassword,
+          new_password: passwordForm.newPassword
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        toast({
+          title: "成功",
+          description: "パスワードが正常に変更されました。",
+        });
+        
+        // フォームをリセット
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      } else {
+        toast({
+          title: "エラー",
+          description: data.message || "パスワードの変更に失敗しました。",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('パスワード変更エラー:', error);
+      toast({
+        title: "エラー",
+        description: "パスワード変更中にエラーが発生しました。",
+        variant: "destructive"
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   if (loading) {
@@ -279,93 +279,77 @@ export default function Profile() {
             </Card>
           )}
 
-          {/* プロファイル編集フォーム */}
+          {/* パスワード変更セクション */}
           <Card>
             <CardHeader>
-              <CardTitle className="japanese-text">プロファイル編集</CardTitle>
+              <CardTitle className="flex items-center gap-2 japanese-text">
+                <Key className="h-5 w-5" />
+                パスワード変更
+              </CardTitle>
               <CardDescription className="japanese-text">
-                あなたの個人情報を更新してください
+                アカウントのパスワードを変更します
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
                 <div>
-                  <Label htmlFor="first_name" className="japanese-text">名前</Label>
+                  <Label htmlFor="current-password" className="japanese-text">現在のパスワード</Label>
                   <Input
-                    id="first_name"
-                    value={profileData.first_name || ''}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
-                    className="japanese-text"
-                    placeholder="太郎"
+                    id="current-password"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
                   />
                 </div>
+                
                 <div>
-                  <Label htmlFor="last_name" className="japanese-text">姓</Label>
+                  <Label htmlFor="new-password" className="japanese-text">新しいパスワード</Label>
                   <Input
-                    id="last_name"
-                    value={profileData.last_name || ''}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
-                    className="japanese-text"
-                    placeholder="田中"
+                    id="new-password"
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
+                    placeholder="6文字以上"
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="job_title" className="japanese-text">職種</Label>
-                <Input
-                  id="job_title"
-                  value={profileData.job_title || ''}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, job_title: e.target.value }))}
-                  className="japanese-text"
-                  placeholder="ソフトウェアエンジニア"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="company" className="japanese-text">会社名</Label>
-                <Input
-                  id="company"
-                  value={profileData.company || ''}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, company: e.target.value }))}
-                  className="japanese-text"
-                  placeholder="株式会社サンプル"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="avatar_url" className="japanese-text">プロファイル画像URL</Label>
-                <Input
-                  id="avatar_url"
-                  type="url"
-                  value={profileData.avatar_url || ''}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, avatar_url: e.target.value }))}
-                  className="japanese-text"
-                  placeholder="https://example.com/avatar.jpg"
-                />
-              </div>
+                
+                <div>
+                  <Label htmlFor="confirm-password" className="japanese-text">新しいパスワード（確認）</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                    required
+                    disabled={isChangingPassword}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  disabled={isChangingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                  className="w-full sm:w-auto"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      変更中...
+                    </>
+                  ) : (
+                    'パスワードを変更'
+                  )}
+                </Button>
+              </form>
             </CardContent>
-            <CardFooter>
-              <Button onClick={updateProfile} disabled={updating} className="japanese-text">
-                {updating ? '更新中...' : 'プロファイルを更新'}
-              </Button>
-            </CardFooter>
           </Card>
 
-          {/* ユーザー招待（管理者のみ） */}
-          {(user?.role === 'admin' || user?.role === 'owner') && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="japanese-text">ユーザー管理</CardTitle>
-                <CardDescription className="japanese-text">
-                  新しいユーザーをテナントに招待
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <InviteUserDialog />
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </MainLayout>

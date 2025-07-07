@@ -18,7 +18,8 @@ import {
   LogOut,
   ChevronUp,
   Menu,
-  X
+  X,
+  Send
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -91,6 +92,11 @@ const sidebarItems: SidebarItem[] = [
     icon: <Inbox className="h-5 w-5" />,
     label: 'メール連携',
     href: '/email',
+  },
+  {
+    icon: <Send className="h-5 w-5" />,
+    label: '一括送信',
+    href: '/bulk-email',
   },
   {
     icon: <BarChart2 className="h-5 w-5" />,

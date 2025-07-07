@@ -4,7 +4,7 @@ import { MailCase } from '../email/types';
 import { toast } from '@/hooks/toast';
 import { useProjects } from '@/hooks/useProjects';
 
-export const useCaseSelection = (caseData: MailCase[]) => {
+export const useCaseSelection = (caseData: MailCase[], companyType?: string) => {
   const [selectedCase, setSelectedCase] = useState<MailCase | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editingCaseData, setEditingCaseData] = useState<MailCase | null>(null);
@@ -20,6 +20,16 @@ export const useCaseSelection = (caseData: MailCase[]) => {
     console.log('Initializing local case data with:', caseData.length, 'cases');
     setLocalCaseData(caseData);
   }, [caseData]);
+
+  // Reset selected case when company type changes
+  useEffect(() => {
+    if (companyType) {
+      console.log('Company type changed to:', companyType, '- resetting selected case');
+      setSelectedCase(null);
+      setEditMode(false);
+      setEditingCaseData(null);
+    }
+  }, [companyType]);
 
   // Handler function to select a case
   const handleCaseSelect = (caseItem: MailCase) => {

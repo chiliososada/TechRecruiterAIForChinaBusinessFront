@@ -42,7 +42,7 @@ export const sendEmail = async (
   });
   
   // Show success message
-  toast.success(`${recipients.length}名にメールを送信しました`, {
+  toast.success(`${recipients.length}名にメールを送信いたしました`, {
     description: `件名: ${subject}`
   });
   
