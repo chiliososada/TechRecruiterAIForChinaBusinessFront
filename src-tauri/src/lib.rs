@@ -3,6 +3,8 @@ use regex::Regex;
 use std::f32::MAX;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::process::{Child, Command, Stdio};
 use std::sync::RwLock;
 use std::{
@@ -100,7 +102,14 @@ pub fn run() {
             *blog.0.write().unwrap() = Some(backend_log.to_str().unwrap().to_string());
 
             let backend_path = if cfg!(debug_assertions) {
-                PathBuf::from("/Users/ziyuanliu/Code/stripe/matching/TechRecruiterAIForChinaBusinessFront/src-tauri/sidecar/backend-sidecar-aarch64-apple-darwin")
+                if cfg!(target_os="macos"){
+                PathBuf::from("/Users/ziyuanliu/Code/stripe/matching/TechRecruiterAIForChinaBusinessFront/src-tauri/sidecar/backend-sidecar-aarch64-apple-darwin")}
+                else if cfg!(target_os="windows"){
+                    PathBuf::from("C:\\Users\\chili\\Downloads\\matching\\TechRecruiterAIForChinaBusinessFront\\src-tauri\\sidecar\\backend-windows.exe")
+                }else {
+                    return Err("not supported platform".into());
+                }
+
             } else {
                 if cfg!(target_os = "macos") {
                     app.path()
@@ -111,7 +120,7 @@ pub fn run() {
                     app.path()
                         .resource_dir()
                         .unwrap()
-                        .join("sidecar/backend-windows")
+                        .join("sidecar\\backend-windows.exe")
                 } else {
                     return Err("not supported platform".into());
                 }
@@ -125,7 +134,7 @@ pub fn run() {
                 .arg(format!("{bp}"));
             let (mut rx, mut child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
             */
-            info!("log dir:{:?}", app.path().app_log_dir().unwrap());
+            info!("log dir:{:?}", data_dir.join("backend.log"));
             info!("backend port:{}", bp);
             info!("backend path:{:?}", backend_path);
             info!("data path:{:?}", data_dir);

@@ -25,7 +25,6 @@
   },
   "bundle": {
     "resources": ["sidecar/**/*"],
-    "externalBin": ["./sidecar/backend-sidecar"],
     "active": true,
     "targets": "all",
     "icon": [
