@@ -179,8 +179,8 @@ export const sendTestEmail = async (
     // Prepare email content with signature if provided
     const fullBody = signature ? `${body}\n\n${signature}` : body;
 
-    // Get the SMTP setting ID from localStorage or use default
-    const smtpSettingId = localStorage.getItem("default_smtp_setting_id");
+    // Get the SMTP setting ID from database for current tenant
+    const smtpSettingId = await getDefaultSMTPSettingId(userInfo);
 
     // Prepare the request parameters
     const params: SendTestEmailParams = {
@@ -260,15 +260,56 @@ export const saveSMTPSettings = async (
       };
     }
 
+    // Check if there's an existing SMTP setting for this tenant
+    let isUpdate = false;
+    let updateSettingId = null;
+
+    // Fetch existing settings for this tenant to check if we need to update
+    try {
+      const existingSettingsResult = await getSMTPSettings(userInfo);
+      if (
+        existingSettingsResult.success &&
+        existingSettingsResult.data &&
+        existingSettingsResult.data.length > 0
+      ) {
+        // Look for an existing setting with the same setting_name or find the default setting
+        const existingSetting = settings.setting_name
+          ? existingSettingsResult.data.find(
+              (s: any) => s.setting_name === settings.setting_name
+            )
+          : existingSettingsResult.data.find((s: any) => s.is_default);
+
+        if (existingSetting) {
+          isUpdate = true;
+          updateSettingId = existingSetting.id;
+          console.log(
+            "Found existing SMTP setting, will update:",
+            updateSettingId
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Could not check existing settings, proceeding with create:",
+        error
+      );
+    }
+
     const params: SMTPSettingsParams = {
       ...settings,
       tenant_id: userInfo.tenant_id,
     };
 
-    console.log("Saving SMTP settings:", params);
+    console.log(`${isUpdate ? "Updating" : "Creating"} SMTP settings:`, params);
 
-    const response = await apiFetch(`${API_BASE}/email/smtp-settings`, {
-      method: "POST",
+    // Use PUT for update or POST for create
+    const url = isUpdate
+      ? `${API_BASE}/email/smtp-settings/${updateSettingId}`
+      : `${API_BASE}/email/smtp-settings`;
+    const method = isUpdate ? "PUT" : "POST";
+
+    const response = await fetch(url, {
+      method: method,
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": BACKEND_API_KEY,
@@ -288,14 +329,13 @@ export const saveSMTPSettings = async (
       };
     }
 
-    // Save the SMTP setting ID to localStorage if it's the default
-    if (settings.is_default && data.data?.id) {
-      localStorage.setItem("default_smtp_setting_id", data.data.id);
-    }
+    // No need to save to localStorage anymore, we get from database
 
     return {
       success: true,
-      message: data.message || "SMTP設定を保存しました",
+      message:
+        data.message ||
+        (isUpdate ? "SMTP設定を更新しました" : "SMTP設定を保存しました"),
       data: data.data,
     };
   } catch (error) {
@@ -305,6 +345,30 @@ export const saveSMTPSettings = async (
       message:
         error instanceof Error ? error.message : "SMTP設定の保存に失敗しました",
     };
+  }
+};
+
+// Get default SMTP setting ID for current tenant
+export const getDefaultSMTPSettingId = async (userFromContext?: {
+  tenant_id: string;
+}): Promise<string | null> => {
+  try {
+    const settingsResult = await getSMTPSettings(userFromContext);
+    if (
+      settingsResult.success &&
+      settingsResult.data &&
+      settingsResult.data.length > 0
+    ) {
+      // Find the default setting or use the first one
+      const defaultSetting =
+        settingsResult.data.find((s: any) => s.is_default) ||
+        settingsResult.data[0];
+      return defaultSetting?.id || null;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting default SMTP setting ID:", error);
+    return null;
   }
 };
 
@@ -351,14 +415,7 @@ export const getSMTPSettings = async (userFromContext?: {
     // The response is directly an array, not wrapped in a data property
     const settings = Array.isArray(data) ? data : data.data || [];
 
-    if (Array.isArray(settings) && settings.length > 0) {
-      const defaultSetting =
-        settings.find((s: any) => s.is_default) || settings[0];
-      if (defaultSetting?.id) {
-        localStorage.setItem("default_smtp_setting_id", defaultSetting.id);
-        console.log("Saved default SMTP setting ID:", defaultSetting.id);
-      }
-    }
+    // No need to save to localStorage anymore
 
     return {
       success: true,
@@ -448,8 +505,8 @@ export const sendIndividualEmail = async (
       };
     }
 
-    // Get the SMTP setting ID from localStorage
-    const smtpSettingId = localStorage.getItem("default_smtp_setting_id");
+    // Get the SMTP setting ID from database for current tenant
+    const smtpSettingId = await getDefaultSMTPSettingId(userInfo);
 
     if (!smtpSettingId) {
       return {
