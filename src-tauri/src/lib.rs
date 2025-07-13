@@ -101,17 +101,7 @@ pub fn run() {
             let blog: State<BackendLog> = app.state();
             *blog.0.write().unwrap() = Some(backend_log.to_str().unwrap().to_string());
 
-            let backend_path = if cfg!(debug_assertions) {
-                if cfg!(target_os="macos"){
-                PathBuf::from("/Users/ziyuanliu/Code/stripe/matching/TechRecruiterAIForChinaBusinessFront/src-tauri/sidecar/backend-sidecar-aarch64-apple-darwin")}
-                else if cfg!(target_os="windows"){
-                    PathBuf::from("C:\\Users\\chili\\Downloads\\matching\\TechRecruiterAIForChinaBusinessFront\\src-tauri\\sidecar\\backend-windows.exe")
-                }else {
-                    return Err("not supported platform".into());
-                }
-
-            } else {
-                if cfg!(target_os = "macos") {
+            let backend_path = if cfg!(target_os = "macos") {
                     app.path()
                         .resource_dir()
                         .unwrap()
@@ -123,8 +113,9 @@ pub fn run() {
                         .join("sidecar\\backend-windows.exe")
                 } else {
                     return Err("not supported platform".into());
-                }
-            };
+                };
+            
+     
             /*
             let sidecar_command = app
                 .shell()
