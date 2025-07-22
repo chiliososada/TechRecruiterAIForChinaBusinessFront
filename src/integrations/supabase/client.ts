@@ -2,6 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+//let supabaseurl: string|undefined
+
+//function setEnv(){
+// supabaseurl = ....
+//}
 // 環境変数から設定を取得
 const getEnvVar = (key: string, fallback?: string): string => {
   return import.meta.env[key as keyof ImportMetaEnv] || fallback || '';

@@ -82,6 +82,15 @@ const App = () => {
     return null;
   }
 
+  useEffect(()=>{
+    if(backendReady){
+      // call api
+      //fetch().then((resp)=>{
+        //setEnv(resp)
+      //})
+    }
+  }, [backendReady])
+
   if (!backendReady) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
