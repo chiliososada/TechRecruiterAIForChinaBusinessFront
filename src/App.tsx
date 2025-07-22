@@ -23,10 +23,12 @@ import { DebugPanel } from "@/components/layout/DebugPanel"; // 添加这一行
 import AuthDebug from "./pages/AuthDebug";
 import TestPage from "./pages/TestPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { EnvironmentProvider } from "@/components/providers/EnvironmentProvider";
 import { useState, useEffect, createContext, useContext } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { setApiBase } from "./utils/backend-api";
 import { set_aimatching } from "./services/aiMatchingService";
+import { configService } from "@/services/configService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,24 +44,35 @@ const App = () => {
   const [backendPort, setBackendPort] = useState<number | undefined>(undefined);
   const [backendReady, setBackendReady] = useState<boolean>(false);
   useEffect(() => {
-    invoke<number>("get_backend_port")
-      .then((port) => {
-        console.log("Backend port from Rust:", port);
-        setBackendPort(port);
-        setApiBase(port);
-        set_aimatching(`http://localhost:${port}`);
-      })
-      .catch((err) => {
-        console.error("Failed to get backend port:", err);
-      });
 
-    invoke<string>("get_backend_log")
-      .then((backend_log) => {
-        console.log("backend log: ", backend_log);
-      })
-      .catch((err) => {
-        console.error("Failed to get backend port:", err);
-      });
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+      setBackendPort(8000)
+      setApiBase(8000)
+      set_aimatching(`http://localhost:8000`);
+    } else {
+
+
+      invoke<number>("get_backend_port")
+        .then((port) => {
+          console.log("Backend port from Rust:", port);
+          setBackendPort(port);
+          setApiBase(port);
+          set_aimatching(`http://localhost:${port}`);
+        })
+        .catch((err) => {
+          console.error("Failed to get backend port:", err);
+
+        });
+
+      invoke<string>("get_backend_log")
+        .then((backend_log) => {
+          console.log("backend log: ", backend_log);
+        })
+        .catch((err) => {
+          console.error("Failed to get backend port:", err);
+        });
+    }
+
 
     const interval = setInterval(async () => {
       try {
@@ -78,18 +91,19 @@ const App = () => {
     return () => clearInterval(interval);
   });
 
+
+  useEffect(() => {
+    if (backendReady && backendPort) {
+      // Update configService with the correct backend URL
+      configService.setBaseUrl(`http://localhost:${backendPort}`);
+      console.log(`🔧 Updated backend URL to: http://localhost:${backendPort}`);
+    }
+  }, [backendReady, backendPort])
   if (!backendPort) {
     return null;
   }
 
-  useEffect(()=>{
-    if(backendReady){
-      // call api
-      //fetch().then((resp)=>{
-        //setEnv(resp)
-      //})
-    }
-  }, [backendReady])
+
 
   if (!backendReady) {
     return (
@@ -106,7 +120,8 @@ const App = () => {
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <TooltipProvider>
-              <AuthProvider>
+              <EnvironmentProvider>
+                <AuthProvider>
                 <Toaster />
                 <Sonner />
                 <BrowserRouter>
@@ -257,7 +272,8 @@ const App = () => {
                 </BrowserRouter>
                 {/* 添加调试面板 - 只在开发环境显示 */}
                 <DebugPanel />
-              </AuthProvider>
+                </AuthProvider>
+              </EnvironmentProvider>
             </TooltipProvider>
           </ToastProvider>
         </QueryClientProvider>
