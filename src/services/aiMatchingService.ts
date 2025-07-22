@@ -1,7 +1,7 @@
 // AI Matching API Service
 // APIとの通信を管理するサービス関数
 
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "@/contexts/AuthContext";
 
 // API レスポンスの型定義
 export interface ProjectToEngineersRequest {
@@ -58,7 +58,7 @@ export interface MatchingHistory {
   executed_by?: string;
   matching_type: string;
   trigger_type: string;
-  execution_status: 'pending' | 'processing' | 'completed' | 'failed';
+  execution_status: "pending" | "processing" | "completed" | "failed";
   started_at: string;
   completed_at?: string;
   total_projects_input: number;
@@ -200,7 +200,11 @@ export interface ApiError {
 
 // ApiErrorのタイプガード
 export function isApiError(error: any): error is ApiError {
-  return error && typeof error.message === 'string' && typeof error.status === 'number';
+  return (
+    error &&
+    typeof error.message === "string" &&
+    typeof error.status === "number"
+  );
 }
 
 // ApiErrorクラス実装
@@ -215,9 +219,9 @@ export class ApiErrorImpl implements ApiError {
 class AIMatchingService {
   private baseUrl: string;
 
-  constructor() {
-    this.baseUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-    console.log('AIMatchingService initialized with baseUrl:', this.baseUrl);
+  constructor(base: string) {
+    this.baseUrl = base;
+    console.log("AIMatchingService initialized with baseUrl:", this.baseUrl);
   }
 
   // 共通のHTTPリクエスト処理
@@ -226,13 +230,15 @@ class AIMatchingService {
     options: RequestInit = {}
   ): Promise<T> {
     try {
-      const apiKey = import.meta.env.VITE_BACKEND_API_KEY || 'sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c';
+      const apiKey =
+        import.meta.env.VITE_BACKEND_API_KEY ||
+        "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
       const response = await fetch(`${this.baseUrl}${url}`, {
         ...options,
         headers: {
-          'Content-Type': 'application/json',
-          'accept': 'application/json',
-          'X-API-Key': apiKey,
+          "Content-Type": "application/json",
+          accept: "application/json",
+          "X-API-Key": apiKey,
           ...options.headers,
         },
       });
@@ -251,10 +257,10 @@ class AIMatchingService {
       if (isApiError(error)) {
         throw error;
       }
-      
+
       // ネットワークエラーなど
       throw new ApiErrorImpl(
-        'ネットワークエラーが発生しました。接続を確認してください。',
+        "ネットワークエラーが発生しました。接続を確認してください。",
         0,
         error
       );
@@ -271,13 +277,13 @@ class AIMatchingService {
       tenant_id: request.tenant_id,
       max_matches: request.max_matches || 10,
       min_score: request.min_score || 0.7,
-      filters: request.filters || {}
+      filters: request.filters || {},
     };
 
     return this.makeRequest<ProjectToEngineersResponse>(
-      '/api/v1/ai-matching/project-to-engineers',
+      "/api/v1/ai-matching/project-to-engineers",
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(apiRequest),
       }
     );
@@ -293,13 +299,13 @@ class AIMatchingService {
       tenant_id: request.tenant_id,
       max_matches: request.max_matches || 10,
       min_score: request.min_score || 0.7,
-      filters: request.filters || {}
+      filters: request.filters || {},
     };
 
     return this.makeRequest<EngineerToProjectsResponse>(
-      '/api/v1/ai-matching/engineer-to-projects',
+      "/api/v1/ai-matching/engineer-to-projects",
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(apiRequest),
       }
     );
@@ -312,15 +318,20 @@ class AIMatchingService {
     status: string,
     comment?: string,
     reviewedBy?: string
-  ): Promise<{ status: string; message: string; match_id: string; new_status: string }> {
+  ): Promise<{
+    status: string;
+    message: string;
+    match_id: string;
+    new_status: string;
+  }> {
     const params = new URLSearchParams();
-    params.append('status', status);
-    if (comment) params.append('comment', comment);
-    if (reviewedBy) params.append('reviewed_by', reviewedBy);
+    params.append("status", status);
+    if (comment) params.append("comment", comment);
+    if (reviewedBy) params.append("reviewed_by", reviewedBy);
 
     return this.makeRequest(
       `/api/v1/ai-matching/matches/${tenantId}/${matchId}/status?${params.toString()}`,
-      { method: 'PUT' }
+      { method: "PUT" }
     );
   }
 
@@ -331,8 +342,8 @@ class AIMatchingService {
     matchingType?: string
   ): Promise<MatchingHistory[]> {
     const params = new URLSearchParams();
-    params.append('limit', limit.toString());
-    if (matchingType) params.append('matching_type', matchingType);
+    params.append("limit", limit.toString());
+    if (matchingType) params.append("matching_type", matchingType);
 
     return this.makeRequest<MatchingHistory[]>(
       `/api/v1/ai-matching/history/${tenantId}?${params.toString()}`
@@ -347,8 +358,8 @@ class AIMatchingService {
     minScore: number = 0
   ): Promise<(MatchedEngineer | MatchedProject)[]> {
     const params = new URLSearchParams();
-    params.append('limit', limit.toString());
-    params.append('min_score', minScore.toString());
+    params.append("limit", limit.toString());
+    params.append("min_score", minScore.toString());
 
     return this.makeRequest(
       `/api/v1/ai-matching/matches/${tenantId}/${historyId}?${params.toString()}`
@@ -366,9 +377,9 @@ class AIMatchingService {
       max_matches: request.max_matches || 100,
       min_score: request.min_score || 0.7,
       executed_by: request.executed_by,
-      matching_type: request.matching_type || 'bulk_matching',
-      trigger_type: request.trigger_type || 'api',
-      batch_size: request.batch_size || 50
+      matching_type: request.matching_type || "bulk_matching",
+      trigger_type: request.trigger_type || "api",
+      batch_size: request.batch_size || 50,
     };
 
     // 案件の所属が指定されている場合のみ追加
@@ -387,9 +398,9 @@ class AIMatchingService {
     }
 
     return this.makeRequest<BulkMatchingResponse>(
-      '/api/v1/ai-matching/bulk-matching',
+      "/api/v1/ai-matching/bulk-matching",
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(apiRequest),
       }
     );
@@ -488,7 +499,11 @@ export interface BulkMatchItem {
 }
 
 // シングルトンインスタンスをエクスポート
-export const aiMatchingService = new AIMatchingService();
+export let aiMatchingService: AIMatchingService | undefined = undefined;
+
+export function set_aimatching(base: string) {
+  aiMatchingService = new AIMatchingService(base);
+}
 
 // カスタムフック: 案件から人材を探す
 export const useProjectToEngineersMatching = () => {
@@ -499,7 +514,7 @@ export const useProjectToEngineersMatching = () => {
     options?: Partial<ProjectToEngineersRequest>
   ) => {
     if (!currentTenant?.id) {
-      throw new ApiErrorImpl('テナントIDが取得できません', 400);
+      throw new ApiErrorImpl("テナントIDが取得できません", 400);
     }
 
     const request: ProjectToEngineersRequest = {
@@ -524,7 +539,7 @@ export const useEngineerToProjectsMatching = () => {
     options?: Partial<EngineerToProjectsRequest>
   ) => {
     if (!currentTenant?.id) {
-      throw new ApiErrorImpl('テナントIDが取得できません', 400);
+      throw new ApiErrorImpl("テナントIDが取得できません", 400);
     }
 
     const request: EngineerToProjectsRequest = {
@@ -548,7 +563,7 @@ export const useBulkMatching = () => {
     options?: Partial<BulkMatchingRequest>
   ) => {
     if (!currentTenant?.id) {
-      throw new ApiErrorImpl('テナントIDが取得できません', 400);
+      throw new ApiErrorImpl("テナントIDが取得できません", 400);
     }
 
     const request: BulkMatchingRequest = {
@@ -565,15 +580,15 @@ export const useBulkMatching = () => {
 
 // ユーティリティ関数
 export const getMatchScoreColor = (score: number): string => {
-  if (score >= 0.8) return 'text-green-600 bg-green-50';
-  if (score >= 0.6) return 'text-yellow-600 bg-yellow-50';
-  return 'text-red-600 bg-red-50';
+  if (score >= 0.8) return "text-green-600 bg-green-50";
+  if (score >= 0.6) return "text-yellow-600 bg-yellow-50";
+  return "text-red-600 bg-red-50";
 };
 
 export const getMatchScoreLabel = (score: number): string => {
-  if (score >= 0.8) return '高品質マッチ';
-  if (score >= 0.6) return '中程度マッチ';
-  return '低品質マッチ';
+  if (score >= 0.8) return "高品質マッチ";
+  if (score >= 0.6) return "中程度マッチ";
+  return "低品質マッチ";
 };
 
 export const formatMatchScore = (score: number): string => {

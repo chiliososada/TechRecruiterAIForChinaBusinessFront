@@ -1,11 +1,38 @@
-import { getStoredTokens } from './auth-api';
+import { getStoredTokens } from "./auth-api";
 
 // Get environment variables
-const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || '';
+const BACKEND_API_URL =
+  import.meta.env.VITE_BACKEND_API_URL || "http://localhost:8000";
+const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "";
 
 // API base path
-const API_BASE = `${BACKEND_API_URL}/api/v1`;
+//const API_BASE = `${BACKEND_API_URL}/api/v1`;
+const API_BASE = "";
+
+let apiBase: string | undefined;
+/**
+ * Call this once (e.g. in App initialization) to set the backend URL.
+ */
+export function setApiBase(port: number) {
+  apiBase = `http://localhost:${port}/api/v1`;
+}
+
+/**
+ * General-purpose fetch wrapper that uses the dynamic API base.
+ */
+export async function apiFetch(
+  endpoint: string,
+  options?: RequestInit
+): Promise<Response> {
+  if (!apiBase) {
+    throw new Error(
+      "API base URL not initialized. Did you forget to call setApiBase()?"
+    );
+  }
+
+  const fullUrl = `${apiBase}${endpoint}`;
+  return await fetch(fullUrl, options);
+}
 
 // Email API interfaces
 export interface SendTestEmailParams {
@@ -31,7 +58,7 @@ export interface SMTPSettingsParams {
   smtp_port: number;
   smtp_username: string;
   smtp_password: string;
-  security_protocol: 'SSL' | 'STARTTLS' | 'NONE';
+  security_protocol: "SSL" | "STARTTLS" | "NONE";
   from_email: string;
   from_name: string;
   reply_to_email?: string;
@@ -56,7 +83,7 @@ export interface SMTPTestParams {
 }
 
 export interface SMTPTestResponse {
-  status: 'success' | 'failed';
+  status: "success" | "failed";
   message: string;
   server_info?: string;
   connection_config?: {
@@ -97,31 +124,31 @@ export interface SendIndividualEmailResponse {
 export const getCurrentUserInfo = () => {
   try {
     // First try to get from auth_user_data (stored during login)
-    const authDataStr = localStorage.getItem('auth_user_data');
+    const authDataStr = localStorage.getItem("auth_user_data");
     if (authDataStr) {
       const authData = JSON.parse(authDataStr);
-      console.log('Found auth_user_data:', authData);
-      
+      console.log("Found auth_user_data:", authData);
+
       // Combine user and tenant info for API calls
       const userInfo = authData.user || {};
       const tenantInfo = authData.tenant || {};
-      
+
       return {
         ...userInfo,
         tenant_id: tenantInfo.id || userInfo.tenant_id,
-        email: userInfo.email || tenantInfo.email
+        email: userInfo.email || tenantInfo.email,
       };
     }
 
     // Fallback: try other possible storage keys
-    const userStr = localStorage.getItem('authUser');
+    const userStr = localStorage.getItem("authUser");
     if (userStr) {
       return JSON.parse(userStr);
     }
 
     return null;
   } catch (error) {
-    console.error('Error getting user info:', error);
+    console.error("Error getting user info:", error);
     return null;
   }
 };
@@ -139,13 +166,13 @@ export const sendTestEmail = async (
     // Try to get user info from context first, then from localStorage
     let userInfo = userFromContext || getCurrentUserInfo();
 
-    console.log('User info for test email:', userInfo);
+    console.log("User info for test email:", userInfo);
 
     if (!userInfo || !userInfo.email) {
-      console.error('User info not found or missing email:', userInfo);
+      console.error("User info not found or missing email:", userInfo);
       return {
         success: false,
-        message: 'ユーザー情報が見つかりません',
+        message: "ユーザー情報が見つかりません",
       };
     }
 
@@ -157,24 +184,24 @@ export const sendTestEmail = async (
 
     // Prepare the request parameters
     const params: SendTestEmailParams = {
-      tenant_id: userInfo.tenant_id || '',
+      tenant_id: userInfo.tenant_id || "",
       smtp_setting_id: smtpSettingId,
       test_email: userInfo.email,
     };
 
-    console.log('Sending test email with params:', params);
-    console.log('Email subject:', subject);
-    console.log('Email body:', fullBody);
-    console.log('API URL:', `${API_BASE}/email/send-test`);
-    console.log('API Key:', BACKEND_API_KEY ? 'Set' : 'Not set');
+    console.log("Sending test email with params:", params);
+    console.log("Email subject:", subject);
+    console.log("Email body:", fullBody);
+    console.log("API URL:", `${API_BASE}/email/send-test`);
+    console.log("API Key:", BACKEND_API_KEY ? "Set" : "Not set");
 
-    const response = await fetch(`${API_BASE}/email/send-test`, {
-      method: 'POST',
+    const response = await apiFetch(`${API_BASE}/email/send-test`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
+        "Content-Type": "application/json",
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        accept: "application/json",
       },
       body: JSON.stringify({
         ...params,
@@ -183,38 +210,41 @@ export const sendTestEmail = async (
       }),
     });
 
-    console.log('Test email API response status:', response.status);
+    console.log("Test email API response status:", response.status);
 
     const data = await response.json();
-    console.log('Test email API response data:', data);
+    console.log("Test email API response data:", data);
 
     // Check both HTTP status and response status field
-    if (!response.ok || data.status === 'failed' || data.status === 'error') {
-      console.error('Test email API error:', data);
+    if (!response.ok || data.status === "failed" || data.status === "error") {
+      console.error("Test email API error:", data);
       return {
         success: false,
         message: data.message || data.error || `エラー: ${response.status}`,
       };
     }
 
-    console.log('Test email sent successfully:', data);
+    console.log("Test email sent successfully:", data);
     return {
       success: true,
-      message: data.message || 'テストメールを送信しました',
+      message: data.message || "テストメールを送信しました",
       data: data.data,
     };
   } catch (error) {
-    console.error('Test email send error:', error);
+    console.error("Test email send error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'テストメール送信に失敗しました',
+      message:
+        error instanceof Error
+          ? error.message
+          : "テストメール送信に失敗しました",
     };
   }
 };
 
 // Save SMTP settings
 export const saveSMTPSettings = async (
-  settings: Omit<SMTPSettingsParams, 'tenant_id'>,
+  settings: Omit<SMTPSettingsParams, "tenant_id">,
   userFromContext?: { tenant_id: string }
 ): Promise<SMTPSettingsResponse> => {
   try {
@@ -226,7 +256,7 @@ export const saveSMTPSettings = async (
     if (!userInfo || !userInfo.tenant_id) {
       return {
         success: false,
-        message: 'テナント情報が見つかりません',
+        message: "テナント情報が見つかりません",
       };
     }
 
@@ -237,20 +267,32 @@ export const saveSMTPSettings = async (
     // Fetch existing settings for this tenant to check if we need to update
     try {
       const existingSettingsResult = await getSMTPSettings(userInfo);
-      if (existingSettingsResult.success && existingSettingsResult.data && existingSettingsResult.data.length > 0) {
+      if (
+        existingSettingsResult.success &&
+        existingSettingsResult.data &&
+        existingSettingsResult.data.length > 0
+      ) {
         // Look for an existing setting with the same setting_name or find the default setting
-        const existingSetting = settings.setting_name 
-          ? existingSettingsResult.data.find((s: any) => s.setting_name === settings.setting_name)
+        const existingSetting = settings.setting_name
+          ? existingSettingsResult.data.find(
+              (s: any) => s.setting_name === settings.setting_name
+            )
           : existingSettingsResult.data.find((s: any) => s.is_default);
-        
+
         if (existingSetting) {
           isUpdate = true;
           updateSettingId = existingSetting.id;
-          console.log('Found existing SMTP setting, will update:', updateSettingId);
+          console.log(
+            "Found existing SMTP setting, will update:",
+            updateSettingId
+          );
         }
       }
     } catch (error) {
-      console.warn('Could not check existing settings, proceeding with create:', error);
+      console.warn(
+        "Could not check existing settings, proceeding with create:",
+        error
+      );
     }
 
     const params: SMTPSettingsParams = {
@@ -258,27 +300,29 @@ export const saveSMTPSettings = async (
       tenant_id: userInfo.tenant_id,
     };
 
-    console.log(`${isUpdate ? 'Updating' : 'Creating'} SMTP settings:`, params);
+    console.log(`${isUpdate ? "Updating" : "Creating"} SMTP settings:`, params);
 
     // Use PUT for update or POST for create
-    const url = isUpdate ? `${API_BASE}/email/smtp-settings/${updateSettingId}` : `${API_BASE}/email/smtp-settings`;
-    const method = isUpdate ? 'PUT' : 'POST';
+    const url = isUpdate
+      ? `${API_BASE}/email/smtp-settings/${updateSettingId}`
+      : `${API_BASE}/email/smtp-settings`;
+    const method = isUpdate ? "PUT" : "POST";
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: method,
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
+        "Content-Type": "application/json",
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        accept: "application/json",
       },
       body: JSON.stringify(params),
     });
 
     const data = await response.json();
-    console.log('SMTP settings API response:', data);
+    console.log("SMTP settings API response:", data);
 
-    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+    if (!response.ok || data.status === "failed" || data.status === "error") {
       return {
         success: false,
         message: data.message || data.error || `エラー: ${response.status}`,
@@ -289,40 +333,49 @@ export const saveSMTPSettings = async (
 
     return {
       success: true,
-      message: data.message || (isUpdate ? 'SMTP設定を更新しました' : 'SMTP設定を保存しました'),
+      message:
+        data.message ||
+        (isUpdate ? "SMTP設定を更新しました" : "SMTP設定を保存しました"),
       data: data.data,
     };
   } catch (error) {
-    console.error('SMTP settings save error:', error);
+    console.error("SMTP settings save error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'SMTP設定の保存に失敗しました',
+      message:
+        error instanceof Error ? error.message : "SMTP設定の保存に失敗しました",
     };
   }
 };
 
 // Get default SMTP setting ID for current tenant
-export const getDefaultSMTPSettingId = async (
-  userFromContext?: { tenant_id: string }
-): Promise<string | null> => {
+export const getDefaultSMTPSettingId = async (userFromContext?: {
+  tenant_id: string;
+}): Promise<string | null> => {
   try {
     const settingsResult = await getSMTPSettings(userFromContext);
-    if (settingsResult.success && settingsResult.data && settingsResult.data.length > 0) {
+    if (
+      settingsResult.success &&
+      settingsResult.data &&
+      settingsResult.data.length > 0
+    ) {
       // Find the default setting or use the first one
-      const defaultSetting = settingsResult.data.find((s: any) => s.is_default) || settingsResult.data[0];
+      const defaultSetting =
+        settingsResult.data.find((s: any) => s.is_default) ||
+        settingsResult.data[0];
       return defaultSetting?.id || null;
     }
     return null;
   } catch (error) {
-    console.error('Error getting default SMTP setting ID:', error);
+    console.error("Error getting default SMTP setting ID:", error);
     return null;
   }
 };
 
 // Get SMTP settings
-export const getSMTPSettings = async (
-  userFromContext?: { tenant_id: string }
-): Promise<{ success: boolean; data?: any; message?: string }> => {
+export const getSMTPSettings = async (userFromContext?: {
+  tenant_id: string;
+}): Promise<{ success: boolean; data?: any; message?: string }> => {
   try {
     const { accessToken } = getStoredTokens();
     const userInfo = userFromContext || getCurrentUserInfo();
@@ -330,26 +383,29 @@ export const getSMTPSettings = async (
     if (!userInfo || !userInfo.tenant_id) {
       return {
         success: false,
-        message: 'テナント情報が見つかりません',
+        message: "テナント情報が見つかりません",
       };
     }
 
-    console.log('Getting SMTP settings for tenant:', userInfo.tenant_id);
+    console.log("Getting SMTP settings for tenant:", userInfo.tenant_id);
 
-    const response = await fetch(`${API_BASE}/email/smtp-settings/${userInfo.tenant_id}`, {
-      method: 'GET',
-      headers: {
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
-      },
-    });
+    const response = await apiFetch(
+      `${API_BASE}/email/smtp-settings/${userInfo.tenant_id}`,
+      {
+        method: "GET",
+        headers: {
+          "X-API-Key": BACKEND_API_KEY,
+          Authorization: accessToken ? `Bearer ${accessToken}` : "",
+          accept: "application/json",
+        },
+      }
+    );
 
-    console.log('SMTP settings response status:', response.status);
+    console.log("SMTP settings response status:", response.status);
     const data = await response.json();
-    console.log('SMTP settings data:', data);
+    console.log("SMTP settings data:", data);
 
-    if (!response.ok || data.status === 'failed') {
+    if (!response.ok || data.status === "failed") {
       return {
         success: false,
         message: data.message || `エラー: ${response.status}`,
@@ -357,7 +413,7 @@ export const getSMTPSettings = async (
     }
 
     // The response is directly an array, not wrapped in a data property
-    const settings = Array.isArray(data) ? data : (data.data || []);
+    const settings = Array.isArray(data) ? data : data.data || [];
 
     // No need to save to localStorage anymore
 
@@ -366,10 +422,11 @@ export const getSMTPSettings = async (
       data: settings,
     };
   } catch (error) {
-    console.error('Get SMTP settings error:', error);
+    console.error("Get SMTP settings error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'SMTP設定の取得に失敗しました',
+      message:
+        error instanceof Error ? error.message : "SMTP設定の取得に失敗しました",
     };
   }
 };
@@ -382,74 +439,79 @@ export const testSMTPConnection = async (
 ): Promise<SMTPTestResponse> => {
   try {
     const { accessToken } = getStoredTokens();
-    
+
     // Get user info for tenant_id and email
     const userInfo = userFromContext || getCurrentUserInfo();
-    
+
     if (!userInfo || !userInfo.tenant_id) {
       return {
-        status: 'failed',
-        message: 'テナント情報が見つかりません',
+        status: "failed",
+        message: "テナント情報が見つかりません",
       };
     }
 
     const params: SMTPTestParams = {
       tenant_id: userInfo.tenant_id,
       smtp_setting_id: smtpSettingId,
-      test_email: testEmail || userInfo.email || '',
+      test_email: testEmail || userInfo.email || "",
     };
 
-    console.log('Testing SMTP connection with params:', params);
+    console.log("Testing SMTP connection with params:", params);
 
-    const response = await fetch(`${API_BASE}/email/smtp-settings/test`, {
-      method: 'POST',
+    const response = await apiFetch(`${API_BASE}/email/smtp-settings/test`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
+        "Content-Type": "application/json",
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        accept: "application/json",
       },
       body: JSON.stringify(params),
     });
 
     const data = await response.json();
-    console.log('SMTP test response:', data);
+    console.log("SMTP test response:", data);
 
     return data;
   } catch (error) {
-    console.error('SMTP connection test error:', error);
+    console.error("SMTP connection test error:", error);
     return {
-      status: 'failed',
-      message: error instanceof Error ? error.message : 'SMTP接続テストに失敗しました',
+      status: "failed",
+      message:
+        error instanceof Error ? error.message : "SMTP接続テストに失敗しました",
     };
   }
 };
 
 // Send individual emails (bulk email)
 export const sendIndividualEmail = async (
-  params: Omit<SendIndividualEmailParams, 'tenant_id' | 'smtp_setting_id'>,
+  params: Omit<SendIndividualEmailParams, "tenant_id" | "smtp_setting_id">,
   userFromContext?: { tenant_id: string }
-): Promise<{ success: boolean; data?: SendIndividualEmailResponse; message: string }> => {
+): Promise<{
+  success: boolean;
+  data?: SendIndividualEmailResponse;
+  message: string;
+}> => {
   try {
     const { accessToken } = getStoredTokens();
-    
+
     // Get user info for tenant_id
     const userInfo = userFromContext || getCurrentUserInfo();
-    
+
     if (!userInfo || !userInfo.tenant_id) {
       return {
         success: false,
-        message: 'テナント情報が見つかりません',
+        message: "テナント情報が見つかりません",
       };
     }
 
     // Get the SMTP setting ID from database for current tenant
     const smtpSettingId = await getDefaultSMTPSettingId(userInfo);
-    
+
     if (!smtpSettingId) {
       return {
         success: false,
-        message: 'SMTP設定が見つかりません。先にSMTP設定を保存してください。',
+        message: "SMTP設定が見つかりません。先にSMTP設定を保存してください。",
       };
     }
 
@@ -460,23 +522,23 @@ export const sendIndividualEmail = async (
       priority: params.priority || 5,
     };
 
-    console.log('Sending individual emails with params:', requestParams);
+    console.log("Sending individual emails with params:", requestParams);
 
-    const response = await fetch(`${API_BASE}/email/send-individual`, {
-      method: 'POST',
+    const response = await apiFetch(`${API_BASE}/email/send-individual`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
+        "Content-Type": "application/json",
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        accept: "application/json",
       },
       body: JSON.stringify(requestParams),
     });
 
     const data = await response.json();
-    console.log('Individual email API response:', data);
+    console.log("Individual email API response:", data);
 
-    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+    if (!response.ok || data.status === "failed" || data.status === "error") {
       return {
         success: false,
         message: data.message || data.error || `エラー: ${response.status}`,
@@ -486,13 +548,14 @@ export const sendIndividualEmail = async (
     return {
       success: true,
       data: data,
-      message: data.message || 'メールを送信しました',
+      message: data.message || "メールを送信しました",
     };
   } catch (error) {
-    console.error('Individual email send error:', error);
+    console.error("Individual email send error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'メール送信に失敗しました',
+      message:
+        error instanceof Error ? error.message : "メール送信に失敗しました",
     };
   }
 };
@@ -538,24 +601,26 @@ export const uploadResumeFile = async (
     const { accessToken } = getStoredTokens();
     const userInfo = userFromContext || getCurrentUserInfo();
 
-
     if (!userInfo || !userInfo.tenant_id) {
-      console.error('Missing tenant info:', { userInfo, hasTenantId: !!userInfo?.tenant_id });
+      console.error("Missing tenant info:", {
+        userInfo,
+        hasTenantId: !!userInfo?.tenant_id,
+      });
       return {
         success: false,
-        message: 'テナント情報が見つかりません',
+        message: "テナント情報が見つかりません",
       };
     }
 
     // Create FormData for file upload
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('tenant_id', userInfo.tenant_id);
+    formData.append("file", file);
+    formData.append("tenant_id", userInfo.tenant_id);
     if (engineerId) {
-      formData.append('engineer_id', engineerId);
+      formData.append("engineer_id", engineerId);
     }
 
-    console.log('Uploading resume file:', {
+    console.log("Uploading resume file:", {
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
@@ -563,19 +628,19 @@ export const uploadResumeFile = async (
       engineerId: engineerId,
     });
 
-    const response = await fetch(`${API_BASE}/resume-upload/upload`, {
-      method: 'POST',
+    const response = await apiFetch(`${API_BASE}/resume-upload/upload`, {
+      method: "POST",
       headers: {
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
       },
       body: formData,
     });
 
     const data = await response.json();
-    console.log('Resume upload response:', data);
+    console.log("Resume upload response:", data);
 
-    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+    if (!response.ok || data.status === "failed" || data.status === "error") {
       return {
         success: false,
         message: data.message || data.error || `エラー: ${response.status}`,
@@ -584,14 +649,17 @@ export const uploadResumeFile = async (
 
     return {
       success: true,
-      message: data.message || '履歴書ファイルをアップロードしました',
+      message: data.message || "履歴書ファイルをアップロードしました",
       data: data.data,
     };
   } catch (error) {
-    console.error('Resume file upload error:', error);
+    console.error("Resume file upload error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : '履歴書ファイルのアップロードに失敗しました',
+      message:
+        error instanceof Error
+          ? error.message
+          : "履歴書ファイルのアップロードに失敗しました",
     };
   }
 };
@@ -609,7 +677,7 @@ export const deleteUploadedFile = async (
     if (!userInfo || !userInfo.tenant_id) {
       return {
         success: false,
-        message: 'テナント情報が見つかりません',
+        message: "テナント情報が見つかりません",
       };
     }
 
@@ -617,59 +685,65 @@ export const deleteUploadedFile = async (
     const extractStoragePathFromUrl = (url: string): string => {
       try {
         const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/');
+        const pathParts = urlObj.pathname.split("/");
         // パスの例: /storage/v1/object/public/bucket/tenant-id/file-name.xlsx
-        const publicIndex = pathParts.indexOf('public');
+        const publicIndex = pathParts.indexOf("public");
         if (publicIndex !== -1 && publicIndex < pathParts.length - 1) {
           // bucket名以降のパスを取得
-          return pathParts.slice(publicIndex + 2).join('/');
+          return pathParts.slice(publicIndex + 2).join("/");
         }
         return url; // フォールバック
       } catch (error) {
-        console.error('Error extracting storage path:', error);
+        console.error("Error extracting storage path:", error);
         return url; // フォールバック
       }
     };
 
     const storagePath = extractStoragePathFromUrl(fileUrl);
-    console.log('Deleting uploaded file:', { fileUrl, storagePath, engineerId });
+    console.log("Deleting uploaded file:", {
+      fileUrl,
+      storagePath,
+      engineerId,
+    });
 
     // engineer_idのバリデーション
     if (!engineerId) {
       return {
         success: false,
-        message: 'エンジニアIDが必要です',
+        message: "エンジニアIDが必要です",
       };
     }
 
     // URL query parameters for the new API
     const queryParams = new URLSearchParams({
       storage_path: storagePath,
-      engineer_id: engineerId
+      engineer_id: engineerId,
     });
 
-    const deleteUrl = `${API_BASE}/resume-upload/delete/${userInfo.tenant_id}?${queryParams.toString()}`;
+    const deleteUrl = `/resume-upload/delete/${
+      userInfo.tenant_id
+    }?${queryParams.toString()}`;
 
     // デバッグ用ログ
-    console.log('API削除リクエストパラメータ:', {
+    console.log("API削除リクエストパラメータ:", {
       tenant_id: userInfo.tenant_id,
       storage_path: storagePath,
       engineer_id: engineerId,
-      url: deleteUrl
+      url: deleteUrl,
     });
 
-    const response = await fetch(deleteUrl, {
-      method: 'DELETE',
+    const response = await apiFetch(deleteUrl, {
+      method: "DELETE",
       headers: {
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
       },
     });
 
     const data = await response.json();
-    console.log('File deletion response:', data);
+    console.log("File deletion response:", data);
 
-    if (!response.ok || data.status === 'failed' || data.status === 'error') {
+    if (!response.ok || data.status === "failed" || data.status === "error") {
       return {
         success: false,
         message: data.message || data.error || `エラー: ${response.status}`,
@@ -678,13 +752,14 @@ export const deleteUploadedFile = async (
 
     return {
       success: true,
-      message: data.message || 'ファイルを削除しました',
+      message: data.message || "ファイルを削除しました",
     };
   } catch (error) {
-    console.error('File deletion error:', error);
+    console.error("File deletion error:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'ファイル削除に失敗しました',
+      message:
+        error instanceof Error ? error.message : "ファイル削除に失敗しました",
     };
   }
 };
@@ -692,7 +767,7 @@ export const deleteUploadedFile = async (
 // Generic API call helper for future backend API calls
 export const callBackendAPI = async <T = any>(
   endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
   body?: any
 ): Promise<{ success: boolean; data?: T; message?: string }> => {
   try {
@@ -701,18 +776,18 @@ export const callBackendAPI = async <T = any>(
     const options: RequestInit = {
       method,
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': BACKEND_API_KEY,
-        'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-        'accept': 'application/json',
+        "Content-Type": "application/json",
+        "X-API-Key": BACKEND_API_KEY,
+        Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        accept: "application/json",
       },
     };
 
-    if (body && method !== 'GET') {
+    if (body && method !== "GET") {
       options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, options);
+    const response = await apiFetch(`${API_BASE}${endpoint}`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -730,7 +805,8 @@ export const callBackendAPI = async <T = any>(
     console.error(`Backend API error (${endpoint}):`, error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'API呼び出しに失敗しました',
+      message:
+        error instanceof Error ? error.message : "API呼び出しに失敗しました",
     };
   }
 };
