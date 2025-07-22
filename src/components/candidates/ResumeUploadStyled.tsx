@@ -419,8 +419,10 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true, onUp
       throw new Error('認証情報が見つかりません');
     }
 
-    const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-    const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || '';
+    // Get API key from global environment variables or use fallback
+    const globalEnv = (window as any).__ENV__;
+    const BACKEND_API_URL = globalEnv?.VITE_BACKEND_API_URL || 'http://localhost:8000';
+    const BACKEND_API_KEY = globalEnv?.VITE_BACKEND_API_KEY || "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
     
     console.log('=== 検証API呼び出し詳細 ===');
     console.log('URL:', `${BACKEND_API_URL}/api/v1/resume-parser/validate`);
@@ -461,8 +463,10 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true, onUp
       throw new Error('認証情報が見つかりません');
     }
 
-    const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-    const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || '';
+    // Get API key from global environment variables or use fallback
+    const globalEnv = (window as any).__ENV__;
+    const BACKEND_API_URL = globalEnv?.VITE_BACKEND_API_URL || 'http://localhost:8000';
+    const BACKEND_API_KEY = globalEnv?.VITE_BACKEND_API_KEY || "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
     const formData = new FormData();
     formData.append('file', file);
     formData.append('tenant_id', currentTenant.id);

@@ -1,13 +1,25 @@
 import { getStoredTokens } from "./auth-api";
 
-// Get environment variables
-const BACKEND_API_URL =
-  import.meta.env.VITE_BACKEND_API_URL || "http://localhost:8000";
-const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "";
-
 // API base path
-//const API_BASE = `${BACKEND_API_URL}/api/v1`;
 const API_BASE = "";
+
+// We'll get the API key dynamically when needed
+let cachedApiKey: string | null = null;
+
+// Helper function to get API key from environment provider
+const getBackendApiKey = (): string => {
+  if (cachedApiKey) return cachedApiKey;
+  
+  // Try to get from global environment variables set by EnvironmentProvider
+  const globalEnv = (window as any).__ENV__;
+  if (globalEnv && globalEnv.VITE_BACKEND_API_KEY) {
+    cachedApiKey = globalEnv.VITE_BACKEND_API_KEY;
+    return cachedApiKey;
+  }
+  
+  // Fallback to hardcoded value from backend .env
+  return "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
+};
 
 let apiBase: string | undefined;
 /**
@@ -193,13 +205,13 @@ export const sendTestEmail = async (
     console.log("Email subject:", subject);
     console.log("Email body:", fullBody);
     console.log("API URL:", `${API_BASE}/email/send-test`);
-    console.log("API Key:", BACKEND_API_KEY ? "Set" : "Not set");
+    console.log("API Key:", getBackendApiKey() ? "Set" : "Not set");
 
     const response = await apiFetch(`${API_BASE}/email/send-test`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
         accept: "application/json",
       },
@@ -312,7 +324,7 @@ export const saveSMTPSettings = async (
       method: method,
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
         accept: "application/json",
       },
@@ -394,7 +406,7 @@ export const getSMTPSettings = async (userFromContext?: {
       {
         method: "GET",
         headers: {
-          "X-API-Key": BACKEND_API_KEY,
+          "X-API-Key": getBackendApiKey(),
           Authorization: accessToken ? `Bearer ${accessToken}` : "",
           accept: "application/json",
         },
@@ -462,7 +474,7 @@ export const testSMTPConnection = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
         accept: "application/json",
       },
@@ -528,7 +540,7 @@ export const sendIndividualEmail = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
         accept: "application/json",
       },
@@ -631,7 +643,7 @@ export const uploadResumeFile = async (
     const response = await apiFetch(`${API_BASE}/resume-upload/upload`, {
       method: "POST",
       headers: {
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
       },
       body: formData,
@@ -735,7 +747,7 @@ export const deleteUploadedFile = async (
     const response = await apiFetch(deleteUrl, {
       method: "DELETE",
       headers: {
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
       },
     });
@@ -777,7 +789,7 @@ export const callBackendAPI = async <T = any>(
       method,
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": BACKEND_API_KEY,
+        "X-API-Key": getBackendApiKey(),
         Authorization: accessToken ? `Bearer ${accessToken}` : "",
         accept: "application/json",
       },

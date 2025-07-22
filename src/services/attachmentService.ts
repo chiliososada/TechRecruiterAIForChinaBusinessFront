@@ -49,8 +49,10 @@ export class AttachmentService {
       formData.append('file', blob, filename);
 
       // アップロードAPI呼び出し
-      const apiKey = import.meta.env.VITE_BACKEND_API_KEY;
-      const apiBaseUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
+      // Get API key from global environment variables or use fallback
+      const globalEnv = (window as any).__ENV__;
+      const apiKey = globalEnv?.VITE_BACKEND_API_KEY || "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
+      const apiBaseUrl = globalEnv?.VITE_BACKEND_API_URL || 'http://localhost:8000';
       
       const uploadResponse = await fetch(`${apiBaseUrl}/api/v1/email/attachments/upload`, {
         method: 'POST',
@@ -104,8 +106,10 @@ export class AttachmentService {
     attachmentFilenames: string[]
   ): Promise<{ queue_id: string; status: string; message: string }> {
     try {
-      const apiKey = import.meta.env.VITE_BACKEND_API_KEY;
-      const apiBaseUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
+      // Get API key from global environment variables or use fallback
+      const globalEnv = (window as any).__ENV__;
+      const apiKey = globalEnv?.VITE_BACKEND_API_KEY || "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
+      const apiBaseUrl = globalEnv?.VITE_BACKEND_API_URL || 'http://localhost:8000';
       
       // Prepare email body with signature if provided
       const fullBodyText = emailData.signature ? `${emailData.body}\n\n${emailData.signature}` : emailData.body;

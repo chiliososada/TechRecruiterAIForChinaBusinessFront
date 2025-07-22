@@ -230,9 +230,10 @@ class AIMatchingService {
     options: RequestInit = {}
   ): Promise<T> {
     try {
-      const apiKey =
-        import.meta.env.VITE_BACKEND_API_KEY ||
-        "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
+      // Get API key from global environment variables or use fallback
+      const globalEnv = (window as any).__ENV__;
+      const apiKey = globalEnv?.VITE_BACKEND_API_KEY || "sk_live_8f7a9b2c1d4e6f8a0b3c5d7e9f1a2b4c";
+      
       const response = await fetch(`${this.baseUrl}${url}`, {
         ...options,
         headers: {
