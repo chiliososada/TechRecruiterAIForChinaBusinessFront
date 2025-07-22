@@ -43,6 +43,9 @@ export function Cases({ companyType = 'own' }: CasesProps) {
   const { projects, loading: projectsLoading, fetchProjects } = useProjects();
   const { archives } = useProjectArchives();
 
+  // Add state for controlling active tab
+  const [activeTab, setActiveTab] = React.useState("list");
+
   // Use custom hooks for state management
   const {
     filter,
@@ -381,12 +384,31 @@ export function Cases({ companyType = 'own' }: CasesProps) {
     await fetchProjects(); // Refresh the projects data
   };
 
+  // Add callback for successful case upload
+  const handleUploadSuccess = () => {
+    console.log('Case upload successful, switching to list tab...');
+    // Just set the unprefixed value
+    setActiveTab("list");
+  };
+
   return (
     <MainLayout>
       <div className="flex-1 space-y-8">
         <CasesHeader pageTitle={pageTitle} />
 
-        <TabsWithContext key={effectiveCompanyType} defaultValue="list" contextId={effectiveCompanyType} className="space-y-6">
+        <TabsWithContext 
+          key={effectiveCompanyType} 
+          value={activeTab}
+          onValueChange={(value) => {
+            // Remove the contextId prefix before storing
+            const prefix = `${effectiveCompanyType}-`;
+            const unprefixedValue = value.startsWith(prefix) ? value.slice(prefix.length) : value;
+            setActiveTab(unprefixedValue);
+          }}
+          defaultValue="list" 
+          contextId={effectiveCompanyType} 
+          className="space-y-6"
+        >
           {/* For own company, show all tabs including the new archive tab */}
           {effectiveCompanyType === 'own' ? (
             <TabsList>
@@ -437,7 +459,7 @@ export function Cases({ companyType = 'own' }: CasesProps) {
           </TabsContent>
           
           <TabsContent contextId={effectiveCompanyType} value="upload" className="space-y-6">
-            <CaseUploadTab />
+            <CaseUploadTab onUploadSuccess={handleUploadSuccess} />
           </TabsContent>
 
           {/* Archive Tab using ONLY ACTIVE archive candidates */}

@@ -14,9 +14,10 @@ import { uploadResumeFile } from '@/utils/backend-api';
 interface ResumeUploadProps {
   onCreateEngineer?: (data: any) => Promise<boolean>;
   isOwnCompany?: boolean;
+  onUploadSuccess?: () => void;
 }
 
-export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: ResumeUploadProps) {
+export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true, onUploadSuccess }: ResumeUploadProps) {
   const [isValidating, setIsValidating] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -369,6 +370,11 @@ export function ResumeUploadStyled({ onCreateEngineer, isOwnCompany = true }: Re
         toast.success('技術者情報と推薦文が保存されました', {
           description: `${candidateData.name}さんのプロフィールが登録されました`
         });
+        
+        // Call success callback to switch tabs
+        if (onUploadSuccess) {
+          onUploadSuccess();
+        }
         
         setCandidateData({
           name: '',

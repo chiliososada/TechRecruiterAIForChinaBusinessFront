@@ -72,6 +72,8 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
   // Transform database engineers to UI format
   const engineers = dbEngineers.map(transformDatabaseToUIEngineer);
 
+  // Add state for controlling active tab
+  const [activeTab, setActiveTab] = useState("list");
 
   // Add state for modal visibility and selected engineer
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
@@ -228,6 +230,13 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
     return result !== null;
   };
 
+  // Add callback for successful engineer upload
+  const handleUploadSuccess = () => {
+    console.log('Engineer upload successful, switching to list tab...');
+    // Just set the unprefixed value
+    setActiveTab("list");
+  };
+
   // Show loading spinner while auth or engineers are loading
   if (authLoading || engineersLoading) {
     return (
@@ -284,7 +293,18 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
       <div className="flex-1 space-y-8">
         <h1 className="text-3xl font-bold mb-6 japanese-text">{pageTitle}</h1>
         
-        <TabsWithContext defaultValue="list" className="w-full" contextId={tabContextId}>
+        <TabsWithContext 
+          value={activeTab}
+          onValueChange={(value) => {
+            // Remove the contextId prefix before storing
+            const prefix = `${tabContextId}-`;
+            const unprefixedValue = value.startsWith(prefix) ? value.slice(prefix.length) : value;
+            setActiveTab(unprefixedValue);
+          }}
+          defaultValue="list" 
+          className="w-full" 
+          contextId={tabContextId}
+        >
           <TabsList className="mb-4">
             <TabsTrigger value="list" contextId={tabContextId} className="japanese-text">技術者一覧</TabsTrigger>
             <TabsTrigger value="resume" contextId={tabContextId} className="japanese-text">技術者登録</TabsTrigger>
@@ -307,6 +327,7 @@ export function Candidates({ companyType = 'own' }: CandidatesProps) {
             <ResumeUpload 
               onCreateEngineer={handleCreateEngineer} 
               isOwnCompany={effectiveCompanyType === 'own'} 
+              onUploadSuccess={handleUploadSuccess}
             />
           </TabsContent>
         </TabsWithContext>

@@ -28,7 +28,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { businessClientManager } from '@/integrations/supabase/business-client';
 
-export function StructuredCaseForm() {
+interface StructuredCaseFormProps {
+  onUploadSuccess?: () => void;
+}
+
+export function StructuredCaseForm({ onUploadSuccess }: StructuredCaseFormProps) {
   const { createProject, loading } = useProjects();
   const { currentTenant, user } = useAuth();
   const location = useLocation();
@@ -141,6 +145,11 @@ export function StructuredCaseForm() {
           title: "成功",
           description: "案件を保存しました",
         });
+
+        // Call the success callback to switch tabs
+        if (onUploadSuccess) {
+          onUploadSuccess();
+        }
 
         // 重置表单
         setCaseData({

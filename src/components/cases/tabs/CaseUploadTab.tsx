@@ -2,7 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StructuredCaseForm } from '@/components/cases/StructuredCaseForm';
 
-export const CaseUploadTab: React.FC = () => {
+interface CaseUploadTabProps {
+  onUploadSuccess?: () => void;
+}
+
+export const CaseUploadTab: React.FC<CaseUploadTabProps> = ({ onUploadSuccess }) => {
   return (
     <div className="space-y-6">
       {/* 只保留结构化表单，移除文件上传部分 */}
@@ -14,7 +18,7 @@ export const CaseUploadTab: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <StructuredCaseForm />
+          <StructuredCaseForm onUploadSuccess={onUploadSuccess} />
         </CardContent>
       </Card>
     </div>
